@@ -1,5 +1,7 @@
 package com.jungo.diy.service;
 
+import com.jungo.diy.model.ExcelModel;
+import com.jungo.diy.model.SheetModel;
 import com.jungo.diy.util.CsvUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -18,28 +20,36 @@ import java.util.List;
 @Slf4j
 public class FileService {
 
-    public List<List<String>> readXlsxFile(MultipartFile file) {
-        List<List<String>> data = new ArrayList<>();
+    public ExcelModel readXlsxFile(MultipartFile file) {
 
+        ExcelModel excelModel = new ExcelModel();
         // 通过文件流创建工作簿
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
-            // 读取第一个 Sheet
-            Sheet sheet = workbook.getSheetAt(0);
-
-            for (Row row : sheet) {
-                List<String> rowData = new ArrayList<>();
-                // 读取单元格内容
-                for (Cell cell : row) {
-
-                    rowData.add(getCellValueAsString(cell));
+            List<SheetModel> sheetModels = new ArrayList<>();
+            int numberOfSheets = workbook.getNumberOfSheets();
+            for (int i = 0; i < numberOfSheets; i++) {
+                SheetModel sheetModel = new SheetModel();
+                Sheet sheet = workbook.getSheetAt(i);
+                sheetModel.setSheetIndex(i);
+                sheetModel.setSheetName(sheet.getSheetName());
+                List<List<String>> data = new ArrayList<>();
+                for (Row row : sheet) {
+                    List<String> rowData = new ArrayList<>();
+                    // 读取单元格内容
+                    for (Cell cell : row) {
+                        rowData.add(getCellValueAsString(cell));
+                    }
+                    data.add(rowData);
                 }
-                data.add(rowData);
+                sheetModel.setData(data);
+                sheetModels.add(sheetModel);
             }
+            excelModel.setSheetModels(sheetModels);
         } catch (Exception e) {
             log.error("FileService#readXlsxFile,出现异常！", e);
         }
 
-        return data;
+        return excelModel;
     }
 
     private String getCellValueAsString(Cell cell) {

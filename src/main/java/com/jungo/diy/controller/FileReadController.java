@@ -1,5 +1,7 @@
 package com.jungo.diy.controller;
 
+import com.jungo.diy.model.ExcelModel;
+import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.service.FileService;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,22 +26,31 @@ public class FileReadController {
     FileService fileService;
 
     @PostMapping("/upload")
-    public List<List<String>> readFile(@RequestParam("file") MultipartFile file) throws IOException {
+    public List<InterfacePerformanceModel> readFile(@RequestParam("file") MultipartFile file) throws IOException {
         String filename = file.getOriginalFilename();
         if (Objects.isNull(filename)) {
             throw new IllegalArgumentException("文件名为空");
         }
 
+        ExcelModel data = null;
         if (filename.endsWith(".xlsx")) {
-            return readXlsxFile(file);
-        } else if (filename.endsWith(".csv")) {
-            return readCsvFile(file);
+            data = readXlsxFile(file);
         } else {
             throw new IllegalArgumentException("不支持的文件类型");
         }
+
+        List<InterfacePerformanceModel> interfacePerformanceModels = new ArrayList<>();
+        for (List<String> datum : data.getSheetModels().get(0).getData()) {
+            InterfacePerformanceModel interfacePerformanceModel = new InterfacePerformanceModel();
+            interfacePerformanceModel.setUrl(datum.get(0));
+            interfacePerformanceModel.setTotalRequestCount(datum.get(1));
+            interfacePerformanceModel.setP99(datum.get(3));
+            interfacePerformanceModels.add(interfacePerformanceModel);
+        }
+        return interfacePerformanceModels;
     }
 
-    private List<List<String>> readXlsxFile(MultipartFile file) throws IOException {
+    private ExcelModel readXlsxFile(MultipartFile file) throws IOException {
         // XLSX 文件读取逻辑
         return fileService.readXlsxFile(file);
     }
