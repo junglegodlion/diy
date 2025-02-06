@@ -11,10 +11,20 @@ public class InterfacePerformanceModel {
     // url
     private String url;
     // 99线
-    private String p99;
+    private Integer p99;
     // 总调用数量
-    private String totalRequestCount;
+    private Integer totalRequestCount;
     // 慢请求数
-    private String slowRequestCount;
+    private Integer slowRequestCount;
+    // 慢请求率
+    private float slowRequestRate;
 
+
+    public float getSlowRequestRate() {
+        if (totalRequestCount == null || slowRequestCount == null) {
+            // 或者抛出异常，根据业务逻辑决定
+            return 0.0f;
+        }
+        return (float) slowRequestCount / totalRequestCount;
+    }
 }
