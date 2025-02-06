@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * @author lichuang3
+ */
 public class CsvUtils {
 
     /**
@@ -25,7 +28,7 @@ public class CsvUtils {
                     .parse(reader);
 
             return parser.getRecords().stream()
-                    .map(record -> record.toMap()) // 转为 Map<字段名, 值>
+                    .map(CSVRecord::toMap) // 转为 Map<字段名, 值>
                     .collect(Collectors.toList());
         }
     }
