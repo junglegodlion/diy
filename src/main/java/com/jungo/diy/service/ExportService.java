@@ -43,7 +43,7 @@ public class ExportService {
         // 设置响应头
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");
-        String fileName = URLEncoder.encode("export.xlsx", "UTF-8");
+        String fileName = URLEncoder.encode("C端接口性能数据.xlsx", "UTF-8");
         response.setHeader("Content-disposition", "attachment;filename=" + fileName);
 
         // 输出文件
@@ -66,6 +66,12 @@ public class ExportService {
             cell.setCellValue(headers[i]);
         }
 
+        // 创建百分比格式
+        DataFormat dataFormat = workbook.createDataFormat();
+        short percentageFormat = dataFormat.getFormat("0.00%");
+        CellStyle percentageCellStyle = workbook.createCellStyle();
+        percentageCellStyle.setDataFormat(percentageFormat);
+
         // 写入数据
         for (int i = 0; i < data.size(); i++) {
             Row row = sheet.createRow(i + 1);
@@ -76,10 +82,20 @@ public class ExportService {
             row.createCell(3).setCellValue(urlPerformanceResponse.getThisWeekP99());
             row.createCell(4).setCellValue(urlPerformanceResponse.getLastWeekTotalRequestCount());
             row.createCell(5).setCellValue(urlPerformanceResponse.getThisWeekTotalRequestCount());
-            row.createCell(6).setCellValue(urlPerformanceResponse.getLastWeekSlowRequestRate());
-            row.createCell(7).setCellValue(urlPerformanceResponse.getThisWeekSlowRequestRate());
+
+            Cell lastWeekSlowRequestRatePercentageCell = row.createCell(6);
+            lastWeekSlowRequestRatePercentageCell.setCellValue(urlPerformanceResponse.getLastWeekSlowRequestRate());
+            lastWeekSlowRequestRatePercentageCell.setCellStyle(percentageCellStyle);
+
+            Cell thisWeekSlowRequestRatePercentageCell = row.createCell(7);
+            thisWeekSlowRequestRatePercentageCell.setCellValue(urlPerformanceResponse.getThisWeekSlowRequestRate());
+            thisWeekSlowRequestRatePercentageCell.setCellStyle(percentageCellStyle);
+
             row.createCell(8).setCellValue(urlPerformanceResponse.getP99Change());
-            row.createCell(9).setCellValue(urlPerformanceResponse.getP99ChangeRate());
+
+            Cell p99ChangeRateCell = row.createCell(9);
+            p99ChangeRateCell.setCellValue(urlPerformanceResponse.getP99ChangeRate());
+            p99ChangeRateCell.setCellStyle(percentageCellStyle);
         }
 
         // 自动调整列宽
