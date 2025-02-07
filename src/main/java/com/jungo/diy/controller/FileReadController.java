@@ -3,6 +3,7 @@ package com.jungo.diy.controller;
 import com.jungo.diy.model.ExcelModel;
 import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.SheetModel;
+import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.service.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,7 +30,7 @@ public class FileReadController {
     FileService fileService;
 
     @PostMapping("/upload")
-    public List<InterfacePerformanceModel> readFile(@RequestParam("file") MultipartFile file) throws IOException {
+    public List<UrlPerformanceModel> readFile(@RequestParam("file") MultipartFile file) throws IOException {
         String filename = file.getOriginalFilename();
         if (Objects.isNull(filename)) {
             throw new IllegalArgumentException("文件名为空");
@@ -42,8 +43,32 @@ public class FileReadController {
             throw new IllegalArgumentException("不支持的文件类型");
         }
 
-        List<InterfacePerformanceModel> interfacePerformanceModels = getInterfacePerformanceModels(data.getSheetModels().get(0), data.getSheetModels().get(1));
-        return interfacePerformanceModels;
+        // 上周的接口性能数据
+        List<InterfacePerformanceModel> lastWeek = getInterfacePerformanceModels(data.getSheetModels().get(0), data.getSheetModels().get(1));
+        // 本周的接口性能数据
+        List<InterfacePerformanceModel> thisWeek = getInterfacePerformanceModels(data.getSheetModels().get(2), data.getSheetModels().get(3));
+        // 将lastWeek转换成map
+        Map<String, InterfacePerformanceModel> lastWeekMap = lastWeek.stream().collect(Collectors.toMap(InterfacePerformanceModel::getToken, x -> x, (x, y) -> x));
+        // 将thisWeek转换成map
+        Map<String, InterfacePerformanceModel> thisWeekMap = thisWeek.stream().collect(Collectors.toMap(InterfacePerformanceModel::getToken, x -> x, (x, y) -> x));
+        // 组装UrlPerformanceModel对象
+        List<UrlPerformanceModel> urlPerformanceModels = new ArrayList<>();
+        for (Map.Entry<String, InterfacePerformanceModel> entry : thisWeekMap.entrySet()) {
+            String token = entry.getKey();
+            InterfacePerformanceModel thisWeekInterfacePerformanceModel = entry.getValue();
+            InterfacePerformanceModel lastWeekInterfacePerformanceModel = lastWeekMap.get(token);
+            if (Objects.nonNull(lastWeekInterfacePerformanceModel)) {
+                UrlPerformanceModel urlPerformanceModel = new UrlPerformanceModel();
+                urlPerformanceModel.setToken(token);
+                urlPerformanceModel.setHost(thisWeekInterfacePerformanceModel.getHost());
+                urlPerformanceModel.setUrl(thisWeekInterfacePerformanceModel.getUrl());
+                urlPerformanceModel.setLastWeek(lastWeekInterfacePerformanceModel);
+                urlPerformanceModel.setThisWeek(thisWeekInterfacePerformanceModel);
+                urlPerformanceModels.add(urlPerformanceModel);
+            }
+
+        }
+        return urlPerformanceModels;
     }
 
     private List<InterfacePerformanceModel> getInterfacePerformanceModels(SheetModel requestsheetModel, SheetModel slowRequestCountSheetModel) {
@@ -54,11 +79,13 @@ public class FileReadController {
         List<InterfacePerformanceModel> interfacePerformanceModels = new ArrayList<>();
         for (List<String> datum : requestsheetModel.getData()) {
             InterfacePerformanceModel interfacePerformanceModel = new InterfacePerformanceModel();
-            String url = datum.get(0) + datum.get(1);
-            interfacePerformanceModel.setUrl(datum.get(0) + datum.get(1));
+            String token = datum.get(0) + datum.get(1);
+            interfacePerformanceModel.setToken(token);
+            interfacePerformanceModel.setHost(datum.get(0));
+            interfacePerformanceModel.setUrl(datum.get(1));
             interfacePerformanceModel.setTotalRequestCount(convertStringToInteger(datum.get(2)));
             interfacePerformanceModel.setP99(convertStringToInteger(datum.get(4)));
-            Integer slowRequestCount = slowRequestCountMap.get(url);
+            Integer slowRequestCount = slowRequestCountMap.get(token);
             if (Objects.isNull(slowRequestCount)) {
                 slowRequestCount = 0;
             }
@@ -73,8 +100,10 @@ public class FileReadController {
         input = input.trim();
         try {
             BigDecimal bd = new BigDecimal(input);
-            bd = bd.stripTrailingZeros(); // 去除末尾零（如 "9.000" → "9"）
-            if (bd.scale() <= 0) { // 若小数位 ≤ 0，说明是整数
+            // 去除末尾零（如 "9.000" → "9"）
+            bd = bd.stripTrailingZeros();
+            // 若小数位 ≤ 0，说明是整数
+            if (bd.scale() <= 0) {
                 return bd.intValueExact();
             } else {
                 throw new NumberFormatException("输入包含非整数部分: " + input);

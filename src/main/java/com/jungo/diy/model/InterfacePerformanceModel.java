@@ -8,6 +8,10 @@ import lombok.Data;
  */
 @Data
 public class InterfacePerformanceModel {
+    // 唯一标识
+    private String token;
+    // host
+    private String host;
     // url
     private String url;
     // 99线
