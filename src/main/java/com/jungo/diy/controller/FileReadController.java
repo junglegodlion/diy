@@ -4,6 +4,7 @@ import com.jungo.diy.model.ExcelModel;
 import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.SheetModel;
 import com.jungo.diy.model.UrlPerformanceModel;
+import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,7 +69,155 @@ public class FileReadController {
             }
 
         }
+
+        // urlPerformanceModels转成map
+        Map<String, UrlPerformanceModel> urlPerformanceModelMap = urlPerformanceModels.stream().collect(Collectors.toMap(UrlPerformanceModel::getUrl, x -> x, (x, y) -> x));
+
+        // 关键链路
+        List<String> criticalLink = new ArrayList<>();
+        // 向列表中添加数据
+        criticalLink.add("/cl-tire-site/tireListModule/getTireList");
+        criticalLink.add("/cl-maint-api/maintMainline/getBasicMaintainData");
+        criticalLink.add("/cl-maint-mainline/mainline/getDynamicData");
+        criticalLink.add("/cl-oto-front-api/batteryList/getBatteryList");
+        criticalLink.add("/mlp-product-search-api/module/search/pageList");
+        criticalLink.add("/mlp-product-search-api/main/search/api/mainProduct");
+        criticalLink.add("/ext-website-cl-beauty-api/channelPage/v4/getBeautyHomeShopListAndRecommendLabel");
+        criticalLink.add("/cl-product-components/GoodsDetail/detailModuleInfo");
+        criticalLink.add("/cl-tire-site/tireModule/getTireDetailModuleData");
+        criticalLink.add("/cl-maint-mainline/productMainline/getMaintProductDetailInfo");
+        criticalLink.add("/cl-ordering-aggregator/ordering/getOrderConfirmFloatLayerData");
+        criticalLink.add("/cl-maint-order-create/order/getConfirmOrderData");
+
+        List<UrlPerformanceResponse>  criticalLinkUrlPerformanceResponses = new ArrayList<>();
+        for (String url : criticalLink) {
+            if (urlPerformanceModelMap.containsKey(url)) {
+                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+                criticalLinkUrlPerformanceResponses.add(urlPerformanceResponse);
+            }
+        }
+        // 五大金刚
+        List<String> fiveGangJing = new ArrayList<>();
+        fiveGangJing.add("/cl-maint-api/apinew/GetBaoYangAppPackages");
+        fiveGangJing.add("/cl-maint-api/apinew/getBasicMaintainData");
+        fiveGangJing.add("/cl-tire-site/tireList/getCombineList");
+        fiveGangJing.add("/cl-tire-site/tireList/getFilterItem");
+        fiveGangJing.add("/ext-website-cl-beauty-api/channelPage/v4/getBeautyHomeModule");
+        fiveGangJing.add("/ext-website-cl-beauty-api/channelPage/v4/getCategoryAndShopList");
+        fiveGangJing.add("/ext-website-cl-beauty-api/channelPage/v4/getBeautyShopList");
+        fiveGangJing.add("/ext-website-cl-beauty-api/beautyIndex/getCategoryAndShopListV2");
+        fiveGangJing.add("/ext-website-cl-beauty-api/beautyIndex/getBeautyShopListV2");
+        fiveGangJing.add("/cl-list-aggregator/channel/getChannelModuleInfo");
+        fiveGangJing.add("/cl-repair-mainline/mainline/v4/getCategoryList");
+        fiveGangJing.add("/cl-repair-mainline/mainline/v4/getDynamicData");
+        List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses = new ArrayList<>();
+        for (String url : fiveGangJing) {
+            if (urlPerformanceModelMap.containsKey(url)) {
+                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+                fiveGangJingUrlPerformanceResponses.add(urlPerformanceResponse);
+            }
+        }
+        // 首屏tab
+        List<String> firstScreenTab = new ArrayList<>();
+        firstScreenTab.add("/cl-homepage-service/homePage/getHomePageInfo");
+        firstScreenTab.add("/cl-homepage-service/cmsService/getInterfaceData");
+        firstScreenTab.add("/cl-homepage-service/tabBarService/getNewTabBars");
+        firstScreenTab.add("/cl-homepage-service/homePage/speciallySaleRecommend");
+        firstScreenTab.add("/cl-user-info-site/userVehicle/getEstimateMileage");
+        firstScreenTab.add("/cl-user-info-site/maint-record/car-latest-condition");
+        firstScreenTab.add("/cl-user-car-site/maint-record/mergeList");
+        firstScreenTab.add("/cl-shop-api/shopTab/getModuleForC");
+        firstScreenTab.add("/cl-shop-api/shopFilterItem/getShopFilterItemList");
+        firstScreenTab.add("/cl-shop-api/shopList/getMainShopList");
+        firstScreenTab.add("/cl-common-api/api/personalCenter/getNewQaMsgV2");
+        firstScreenTab.add("/cl-common-api/api/personalCenter/getPersonalOrderInfo");
+        firstScreenTab.add("/cl-common-api/api/personalCenter/getPersonalProductInfo");
+        firstScreenTab.add("/cl-common-api/api/personalCenter/getCmsModuleList");
+        firstScreenTab.add("/cl-common-api/api/personalCenter/getNewOrderInfo");
+        firstScreenTab.add("/cl-common-api/api/personalCenter/getTopBanner");
+        firstScreenTab.add("/cl-common-api/api/personalCenter/getAutoSuperConfig");
+        List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses = new ArrayList<>();
+        for (String url : firstScreenTab) {
+            if (urlPerformanceModelMap.containsKey(url)) {
+                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+                firstScreenTabUrlPerformanceResponses.add(urlPerformanceResponse);
+            }
+        }
+
+        // 麒麟组件接口
+        List<String> qilinComponentInterface = new ArrayList<>();
+        qilinComponentInterface.add("/cl-maint-api/activity/getProducts");
+        qilinComponentInterface.add("/cl-maint-api/greatValueCard/getActivityCards");
+        qilinComponentInterface.add("/cl-tire-site/activityPage/getKylinActivityPageProductList");
+        qilinComponentInterface.add("/ext-website-cl-beauty-api/beautyKylin/getShopList");
+        qilinComponentInterface.add("/cl-car-product-api/Product/getChannelActivityComponent");
+        qilinComponentInterface.add("/cl-car-product-api/Product/getActivityComponentDetail");
+        qilinComponentInterface.add("/cl-oto-front-api/battery/BatteryActivityComponentDetail");
+        qilinComponentInterface.add("/cl-shop-api/component/getKylinShopList");
+        qilinComponentInterface.add("/cl-kael-agg-service/salePlan/getCombinedCommodityPool");
+        qilinComponentInterface.add("/cl-common-api/api/memberPlus/getPlusCardChannelInfo");
+
+        List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses = new ArrayList<>();
+        for (String url : qilinComponentInterface) {
+            if (urlPerformanceModelMap.containsKey(url)) {
+                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+                qilinComponentInterfaceUrlPerformanceResponses.add(urlPerformanceResponse);
+            }
+        }
+
+        // 其他核心业务接口
+        List<String> otherCoreBusinessInterface = new ArrayList<>();
+        otherCoreBusinessInterface.add("/ext-website-cl-beauty-api/beautyProduct/getBeautyProductDetailV2");
+        otherCoreBusinessInterface.add("/cl-ordering-aggregator/ordering/getOrderConfirmData");
+        otherCoreBusinessInterface.add("/ext-website-cl-beauty-api/order/getOrderCheckInfo");
+        otherCoreBusinessInterface.add("/cl-ordering-aggregator/ordering/createOrder");
+        otherCoreBusinessInterface.add("/cl-maint-order-create/order/createorder");
+
+        List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses = new ArrayList<>();
+        for (String url : otherCoreBusinessInterface) {
+            if (urlPerformanceModelMap.containsKey(url)) {
+                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+                otherCoreBusinessInterfaceUrlPerformanceResponses.add(urlPerformanceResponse);
+            }
+        }
+        // 访问量top30接口
+        List<UrlPerformanceResponse> accessVolumeTop30Interface = new ArrayList<>();
+        // 首先将urlPerformanceModels排除host为"mkt-gateway.tuhu.cn"的对象，然后按照thisWeek.totalRequestCount逆序排序，最后取前30个url
+        List<UrlPerformanceModel> sortUrlPerformanceModels = urlPerformanceModelMap.values().stream().filter(urlPerformanceModel -> !"mkt-gateway.tuhu.cn".equals(urlPerformanceModel.getHost())).sorted((o1, o2) -> o2.getThisWeek().getTotalRequestCount() - o1.getThisWeek().getTotalRequestCount()).collect(Collectors.toList());
+
+        for (int i = 0; i < 30; i++) {
+            String url = sortUrlPerformanceModels.get(i).getUrl();
+            if (criticalLink.contains(url)
+                    || fiveGangJing.contains(url)
+                    || firstScreenTab.contains(url)
+                    || qilinComponentInterface.contains(url)
+                    || otherCoreBusinessInterface.contains(url)) {
+
+            } else {
+                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+                accessVolumeTop30Interface.add(urlPerformanceResponse);
+            }
+        }
+
+
+
         return urlPerformanceModels;
+    }
+
+    private static UrlPerformanceResponse getUrlPerformanceResponse(String url, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
+        UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
+        UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
+        urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
+        urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
+        urlPerformanceResponse.setLastWeekP99(urlPerformanceModel.getLastWeek().getP99());
+        urlPerformanceResponse.setThisWeekP99(urlPerformanceModel.getThisWeek().getP99());
+        urlPerformanceResponse.setLastWeekTotalRequestCount(urlPerformanceModel.getLastWeek().getTotalRequestCount());
+        urlPerformanceResponse.setThisWeekTotalRequestCount(urlPerformanceModel.getThisWeek().getTotalRequestCount());
+        urlPerformanceResponse.setLastWeekSlowRequestRate(urlPerformanceModel.getLastWeek().getSlowRequestRate());
+        urlPerformanceResponse.setThisWeekSlowRequestRate(urlPerformanceModel.getThisWeek().getSlowRequestRate());
+        urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
+        urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
+        return urlPerformanceResponse;
     }
 
     private List<InterfacePerformanceModel> getInterfacePerformanceModels(SheetModel requestsheetModel, SheetModel slowRequestCountSheetModel) {
