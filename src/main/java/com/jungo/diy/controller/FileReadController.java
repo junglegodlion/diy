@@ -5,6 +5,7 @@ import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.SheetModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -30,8 +32,11 @@ public class FileReadController {
     @Autowired
     FileService fileService;
 
+    @Autowired
+    private ExportService exportService;
+
     @PostMapping("/upload")
-    public List<UrlPerformanceModel> readFile(@RequestParam("file") MultipartFile file) throws IOException {
+    public void readFile(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
         String filename = file.getOriginalFilename();
         if (Objects.isNull(filename)) {
             throw new IllegalArgumentException("文件名为空");
@@ -199,9 +204,7 @@ public class FileReadController {
             }
         }
 
-
-
-        return urlPerformanceModels;
+        exportService.exportToExcel(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface, response);
     }
 
     private static UrlPerformanceResponse getUrlPerformanceResponse(String url, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
