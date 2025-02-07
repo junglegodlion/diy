@@ -9,6 +9,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -43,7 +45,12 @@ public class ExportService {
         // 设置响应头
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");
-        String fileName = URLEncoder.encode("C端接口性能数据.xlsx", "UTF-8");
+
+        // 获取当天日期并格式化为 yyyy-MM-dd 格式
+        LocalDate currentDate = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        String formattedDate = currentDate.format(formatter);
+        String fileName = URLEncoder.encode(formattedDate + "performance.xlsx", "UTF-8");
         response.setHeader("Content-disposition", "attachment;filename=" + fileName);
 
         // 输出文件
