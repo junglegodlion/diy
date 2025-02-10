@@ -1,15 +1,10 @@
 package com.jungo.diy.controller;
 
-import com.jungo.diy.model.ExcelModel;
-import com.jungo.diy.model.InterfacePerformanceModel;
-import com.jungo.diy.model.SheetModel;
-import com.jungo.diy.model.UrlPerformanceModel;
+import com.jungo.diy.model.*;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,12 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
@@ -218,7 +209,7 @@ public class FileReadController {
 
 
     @PostMapping("/upload/getCharts")
-    public void getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
+    public List<P99Model> getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
         String filename = file.getOriginalFilename();
         if (Objects.isNull(filename)) {
             throw new IllegalArgumentException("文件名为空");
@@ -231,82 +222,43 @@ public class FileReadController {
             throw new IllegalArgumentException("不支持的文件类型");
         }
 
-
-        // 输出99线数据
-        // 创建工作簿
-        try (Workbook workbook = new XSSFWorkbook()) {
-            // 定义 Sheet List<String>名称和数据列表
-            String[] sheetNames = {"99线"};
-            List<List<String>> dataLists = data.getSheetModels().get(0).getData();
-
-            // 创建多个 Sheet 并写入数据
-            for (int i = 0; i < sheetNames.length; i++) {
-                createSheet(workbook, sheetNames[i], dataLists);
-            }
-
-            // 设置响应头
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            response.setCharacterEncoding("utf-8");
-
-            // 获取当天日期并格式化为 yyyy-MM-dd 格式
-            LocalDate currentDate = LocalDate.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String formattedDate = currentDate.format(formatter);
-            String fileName = URLEncoder.encode(formattedDate + "_99.xlsx", StandardCharsets.UTF_8.toString());
-            response.setHeader("Content-disposition", "attachment;filename=" + fileName);
-
-            // 拼接完整的文件路径
-            String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出";
-            String filePath = directoryPath + "/" + fileName;
-
-            // 写入文件
-            try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
-                workbook.write(fileOut);
-            } catch (IOException e) {
-                log.error("ExportService#exportToExcel,出现异常！", e);
-            }
-
-            // 输出文件
-            try (OutputStream outputStream = response.getOutputStream()) {
-                workbook.write(outputStream);
-            }
-        } catch (IOException e) {
-            log.error("ExportService#exportToExcel,出现异常！", e);
-        }
-    }
-
-    private void createSheet(Workbook workbook, String sheetName, List<List<String>> dataLists) {
-        // 创建 Sheet
-        Sheet sheet = workbook.createSheet(sheetName);
-
-        // 创建表头
-        Row headerRow = sheet.createRow(0);
-        String[] headers = {"日期", "周期", "99线"};
-        for (int i = 0; i < headers.length; i++) {
-            Cell cell = headerRow.createCell(i);
-            cell.setCellValue(headers[i]);
-        }
-
+        List<List<String>> dataLists = data.getSheetModels().get(0).getData();
+        List<P99Model> p99Models = new ArrayList<>();
         // 使用ISO周规则计算周数
         WeekFields weekFields = WeekFields.ISO;
-
         // 写入数据
         for (int i = 0; i < dataLists.size() - 1; i++) {
-            Row row = sheet.createRow(i + 1);
             List<String> list = dataLists.get(i + 1);
             String dateString = list.get(0);
-            Double dateDouble = Double.valueOf(dateString);
+            double dateDouble = Double.parseDouble(dateString);
             LocalDate localDate = getLocalDate(dateDouble);
             int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
-            row.createCell(0).setCellValue(getDateString(dateDouble));
-            row.createCell(1).setCellValue(weekNumber);
-            row.createCell(2).setCellValue(list.get(3));
+            P99Model p99Model = new P99Model();
+            p99Model.setDate(getDateString(dateDouble));
+            p99Model.setPeriod(weekNumber);
+            p99Model.setP99(convertStringToInteger(list.get(3)));
+            p99Models.add(p99Model);
         }
+        // 将p99Models按照周数分组，组内的顺序按照日期排序，并计算平均值
+        Map<Integer, List<P99Model>> groupedP99Models = p99Models.stream().collect(Collectors.groupingBy(P99Model::getPeriod));
+        List<P99Model> averageP99Models = new ArrayList<>();
+        for (Map.Entry<Integer, List<P99Model>> entry : groupedP99Models.entrySet()) {
+            List<P99Model> p99ModelList = entry.getValue();
+            int sum = p99ModelList.stream().mapToInt(P99Model::getP99).sum();
+            int average = sum / p99ModelList.size();
+            P99Model averageP99Model = new P99Model();
 
-        // 自动调整列宽
-        for (int i = 0; i < headers.length; i++) {
-            sheet.autoSizeColumn(i);
+            // 设置2025年第2周（ISO标准周计算）
+            LocalDate date = LocalDate.of(2025,  1, 1)
+                    .with(WeekFields.ISO.weekOfYear(),  entry.getKey())
+                    .with(WeekFields.ISO.dayOfWeek(),  3); // 周三
+
+            averageP99Model.setDate(date.format(DateTimeFormatter.ISO_DATE));
+            averageP99Model.setPeriod(entry.getKey());
+            averageP99Model.setP99(average);
+            averageP99Models.add(averageP99Model);
         }
+        return averageP99Models;
     }
 
     private static String getDateString(double excelSerialNumber) {
