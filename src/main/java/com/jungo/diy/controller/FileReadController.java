@@ -7,6 +7,9 @@ import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,19 +17,25 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.WeekFields;
+import java.util.*;
 import java.util.stream.Collectors;
+
 
 /**
  * @author lichuang3
  * @date 2025-02-06 12:51
  */
 @RestController
+@Slf4j
 public class FileReadController {
 
     @Autowired
@@ -35,7 +44,7 @@ public class FileReadController {
     @Autowired
     private ExportService exportService;
 
-    @PostMapping("/upload")
+    @PostMapping("/upload/getPerformance")
     public void readFile(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
         String filename = file.getOriginalFilename();
         if (Objects.isNull(filename)) {
@@ -205,6 +214,120 @@ public class FileReadController {
         }
 
         exportService.exportToExcel(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface, response);
+    }
+
+
+    @PostMapping("/upload/getCharts")
+    public void getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
+        String filename = file.getOriginalFilename();
+        if (Objects.isNull(filename)) {
+            throw new IllegalArgumentException("文件名为空");
+        }
+
+        ExcelModel data = null;
+        if (filename.endsWith(".xlsx")) {
+            data = readXlsxFile(file);
+        } else {
+            throw new IllegalArgumentException("不支持的文件类型");
+        }
+
+
+        // 输出99线数据
+        // 创建工作簿
+        try (Workbook workbook = new XSSFWorkbook()) {
+            // 定义 Sheet List<String>名称和数据列表
+            String[] sheetNames = {"99线"};
+            List<List<String>> dataLists = data.getSheetModels().get(0).getData();
+
+            // 创建多个 Sheet 并写入数据
+            for (int i = 0; i < sheetNames.length; i++) {
+                createSheet(workbook, sheetNames[i], dataLists);
+            }
+
+            // 设置响应头
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setCharacterEncoding("utf-8");
+
+            // 获取当天日期并格式化为 yyyy-MM-dd 格式
+            LocalDate currentDate = LocalDate.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            String formattedDate = currentDate.format(formatter);
+            String fileName = URLEncoder.encode(formattedDate + "_99.xlsx", StandardCharsets.UTF_8.toString());
+            response.setHeader("Content-disposition", "attachment;filename=" + fileName);
+
+            // 拼接完整的文件路径
+            String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出";
+            String filePath = directoryPath + "/" + fileName;
+
+            // 写入文件
+            try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+                workbook.write(fileOut);
+            } catch (IOException e) {
+                log.error("ExportService#exportToExcel,出现异常！", e);
+            }
+
+            // 输出文件
+            try (OutputStream outputStream = response.getOutputStream()) {
+                workbook.write(outputStream);
+            }
+        } catch (IOException e) {
+            log.error("ExportService#exportToExcel,出现异常！", e);
+        }
+    }
+
+    private void createSheet(Workbook workbook, String sheetName, List<List<String>> dataLists) {
+        // 创建 Sheet
+        Sheet sheet = workbook.createSheet(sheetName);
+
+        // 创建表头
+        Row headerRow = sheet.createRow(0);
+        String[] headers = {"日期", "周期", "99线"};
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+        }
+
+        // 使用ISO周规则计算周数
+        WeekFields weekFields = WeekFields.ISO;
+
+        // 写入数据
+        for (int i = 0; i < dataLists.size() - 1; i++) {
+            Row row = sheet.createRow(i + 1);
+            List<String> list = dataLists.get(i + 1);
+            String dateString = list.get(0);
+            Double dateDouble = Double.valueOf(dateString);
+            LocalDate localDate = getLocalDate(dateDouble);
+            int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
+            row.createCell(0).setCellValue(getDateString(dateDouble));
+            row.createCell(1).setCellValue(weekNumber);
+            row.createCell(2).setCellValue(list.get(3));
+        }
+
+        // 自动调整列宽
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    private static String getDateString(double excelSerialNumber) {
+        LocalDate targetDate = getLocalDate(excelSerialNumber);
+        return targetDate.format(DateTimeFormatter.ISO_DATE);
+    }
+
+    private static LocalDate getLocalDate(double excelSerialNumber) {
+        int days = (int) excelSerialNumber;
+
+        // Excel日期起点：1900-01-01（序列号1对应1900-01-01）
+        LocalDate baseDate = LocalDate.of(1900, 1, 1);
+
+        // 调整Excel的闰年误差（1900年非闰年，但Excel视为闰年）
+        if (days > 60) {
+            days -= 1;
+        }
+
+        // 计算实际日期（注意：Excel序列号从1开始，需减1天）
+        LocalDate targetDate = baseDate.plusDays(days - 1);
+        return targetDate;
     }
 
     private static UrlPerformanceResponse getUrlPerformanceResponse(String url, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
