@@ -1,53 +1,51 @@
 package com.jungo.diy.service;
 
+import com.jungo.diy.model.P99Model;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xssf.usermodel.*;
-import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLblPos;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
-import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
-import org.openxmlformats.schemas.drawingml.x2006.main.CTTextBody;
-import org.openxmlformats.schemas.drawingml.x2006.main.CTTextBodyProperties;
-import org.openxmlformats.schemas.drawingml.x2006.main.CTTextCharacterProperties;
-import org.openxmlformats.schemas.drawingml.x2006.main.CTTextParagraph;
 import org.springframework.stereotype.Service;
 
 
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ExcelChartService {
 
-    public static XSSFWorkbook generateExcelWithChart() throws IOException {
+    public static XSSFWorkbook generateExcelWithChart(List<P99Model> averageP99Models) throws IOException {
         XSSFWorkbook workbook = new XSSFWorkbook();
         
         // 1. 创建数据表
-        XSSFSheet dataSheet = workbook.createSheet("销售数据");
-        fillTestData(dataSheet); // 填充测试数据
+        XSSFSheet dataSheet = workbook.createSheet("99线周维度");
+        fillTestData(dataSheet, averageP99Models); // 填充测试数据
         
         // 2. 创建图表表
-        XSSFSheet chartSheet = workbook.createSheet("图表");
+        XSSFSheet chartSheet = workbook.createSheet("99线周维度-图表");
         createLineChart(workbook, dataSheet, chartSheet);
         
         return workbook;
     }
 
-    private static void fillTestData(XSSFSheet sheet) {
+    private static void fillTestData(XSSFSheet sheet, List<P99Model> averageP99Models) {
         // 填充示例数据（同之前的实现）
         Row headerRow = sheet.createRow(0);
-        headerRow.createCell(0).setCellValue("月份");
-        headerRow.createCell(1).setCellValue("销售额");
-        
-        String[] months = {"1月", "2月", "3月", "4月"};
-        double[] sales = {45000, 52000, 48000, 61000};
-        
-        for (int i = 0; i < months.length; i++) {
+        headerRow.createCell(0).setCellValue("日期");
+        headerRow.createCell(1).setCellValue("99线");
+
+        // 填充数据行
+        List<String> dates = averageP99Models.stream().map(P99Model::getDate).collect(Collectors.toList());
+        List<Integer> p99Values = averageP99Models.stream().map(P99Model::getP99).collect(Collectors.toList());
+
+        for (int i = 0; i < dates.size(); i++) {
             Row row = sheet.createRow(i + 1);
-            row.createCell(0).setCellValue(months[i]);
-            row.createCell(1).setCellValue(sales[i]);
+            row.createCell(0).setCellValue(dates.get(i));
+            row.createCell(1).setCellValue(p99Values.get(i));
         }
     }
 
@@ -56,18 +54,19 @@ public class ExcelChartService {
         XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 0, 5, 15, 25);
         
         XSSFChart chart = drawing.createChart(anchor);
-        chart.setTitleText("月度销售趋势");
+        chart.setTitleText("99线周维度-图表");
         
         // 配置坐标轴
         XDDFCategoryAxis xAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
         XDDFValueAxis yAxis = chart.createValueAxis(AxisPosition.LEFT);
-        yAxis.setTitle("销售额");
+        yAxis.setTitle("99线");
         
         // 定义数据范围
+        // 第一列数据作为
         XDDFDataSource<String> xData = XDDFDataSourcesFactory.fromStringCellRange(dataSheet,
-            new CellRangeAddress(1, 4, 0, 0));
+            new CellRangeAddress(1, 8, 0, 0));
         XDDFNumericalDataSource<Double> yData = XDDFDataSourcesFactory.fromNumericCellRange(dataSheet,
-                new CellRangeAddress(1, 4, 1, 1));
+                new CellRangeAddress(1, 8, 1, 1));
 
         // 创建折线图数据
         XDDFLineChartData data = (XDDFLineChartData) chart.createData(ChartTypes.LINE, xAxis, yAxis);
@@ -81,11 +80,13 @@ public class ExcelChartService {
         // POI 5.2.3 及以上，启用数据标签的正确方式
         // **仅显示数据点的 Y 轴数值（不显示类别名、序列名等）**
         CTDLbls dLbls = chart.getCTChart().getPlotArea().getLineChartArray(0).getSerArray(0).addNewDLbls();
-        dLbls.addNewShowVal().setVal(true);  // 仅显示数值
-        dLbls.addNewShowLegendKey().setVal(false);  // 不显示图例键
-        dLbls.addNewShowCatName().setVal(false);  // 不显示类别名称
+        // 仅显示数值
+        dLbls.addNewShowVal().setVal(true);
+        // 不显示图例键
+        dLbls.addNewShowLegendKey().setVal(false);
+        // 不显示类别名称
+        dLbls.addNewShowCatName().setVal(false);
         dLbls.addNewShowSerName().setVal(false);
-        // 设置标签位置（上方）
-        // dLbls.addNewDLblPos().setVal(org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos.T);
+
     }
 }

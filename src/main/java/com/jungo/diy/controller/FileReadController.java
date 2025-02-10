@@ -2,16 +2,24 @@ package com.jungo.diy.controller;
 
 import com.jungo.diy.model.*;
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.service.ExcelChartService;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -209,7 +217,7 @@ public class FileReadController {
 
 
     @PostMapping("/upload/getCharts")
-    public List<P99Model> getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
+    public ResponseEntity<Resource> getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
         String filename = file.getOriginalFilename();
         if (Objects.isNull(filename)) {
             throw new IllegalArgumentException("文件名为空");
@@ -222,23 +230,34 @@ public class FileReadController {
             throw new IllegalArgumentException("不支持的文件类型");
         }
 
-        List<List<String>> dataLists = data.getSheetModels().get(0).getData();
-        List<P99Model> p99Models = new ArrayList<>();
-        // 使用ISO周规则计算周数
-        WeekFields weekFields = WeekFields.ISO;
-        // 写入数据
-        for (int i = 0; i < dataLists.size() - 1; i++) {
-            List<String> list = dataLists.get(i + 1);
-            String dateString = list.get(0);
-            double dateDouble = Double.parseDouble(dateString);
-            LocalDate localDate = getLocalDate(dateDouble);
-            int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
-            P99Model p99Model = new P99Model();
-            p99Model.setDate(getDateString(dateDouble));
-            p99Model.setPeriod(weekNumber);
-            p99Model.setP99(convertStringToInteger(list.get(3)));
-            p99Models.add(p99Model);
-        }
+        List<P99Model> p99Models = getP99Models(data);
+        List<P99Model> averageP99Models = getAverageP99Models(p99Models);
+
+
+        // 1. 生成工作簿
+        XSSFWorkbook workbook = ExcelChartService.generateExcelWithChart(averageP99Models);
+
+        // 2. 转换为字节流
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        workbook.write(bos);
+        workbook.close();
+
+        // 3. 封装为Resource
+        byte[] bytes = bos.toByteArray();
+        ByteArrayResource resource = new ByteArrayResource(bytes);
+
+        // 4. 设置响应头
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=week_99line_chart.xlsx");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .contentLength(bytes.length)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(resource);
+    }
+
+    private static List<P99Model> getAverageP99Models(List<P99Model> p99Models) {
         // 将p99Models按照周数分组，组内的顺序按照日期排序，并计算平均值
         Map<Integer, List<P99Model>> groupedP99Models = p99Models.stream().collect(Collectors.groupingBy(P99Model::getPeriod));
         List<P99Model> averageP99Models = new ArrayList<>();
@@ -259,6 +278,27 @@ public class FileReadController {
             averageP99Models.add(averageP99Model);
         }
         return averageP99Models;
+    }
+
+    private static List<P99Model> getP99Models(ExcelModel data) {
+        List<List<String>> dataLists = data.getSheetModels().get(0).getData();
+        List<P99Model> p99Models = new ArrayList<>();
+        // 使用ISO周规则计算周数
+        WeekFields weekFields = WeekFields.ISO;
+        // 写入数据
+        for (int i = 0; i < dataLists.size() - 1; i++) {
+            List<String> list = dataLists.get(i + 1);
+            String dateString = list.get(0);
+            double dateDouble = Double.parseDouble(dateString);
+            LocalDate localDate = getLocalDate(dateDouble);
+            int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
+            P99Model p99Model = new P99Model();
+            p99Model.setDate(getDateString(dateDouble));
+            p99Model.setPeriod(weekNumber);
+            p99Model.setP99(convertStringToInteger(list.get(3)));
+            p99Models.add(p99Model);
+        }
+        return p99Models;
     }
 
     private static String getDateString(double excelSerialNumber) {
