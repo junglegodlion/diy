@@ -5,6 +5,9 @@ import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xddf.usermodel.PresetColor;
@@ -201,16 +204,14 @@ public class FileReadController {
 
         for (int i = 0; i < 30; i++) {
             String url = sortUrlPerformanceModels.get(i).getUrl();
-            if (criticalLink.contains(url)
-                    || fiveGangJing.contains(url)
-                    || firstScreenTab.contains(url)
-                    || qilinComponentInterface.contains(url)
-                    || otherCoreBusinessInterface.contains(url)) {
-
-            } else {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
-                accessVolumeTop30Interface.add(urlPerformanceResponse);
-            }
+            if (!criticalLink.contains(url)
+                    && !fiveGangJing.contains(url)
+                    && !firstScreenTab.contains(url)
+                    && !qilinComponentInterface.contains(url)
+                    && !otherCoreBusinessInterface.contains(url)) {
+                        UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+                        accessVolumeTop30Interface.add(urlPerformanceResponse);
+                    }
         }
 
         exportService.exportToExcel(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface, response);
@@ -248,20 +249,10 @@ public class FileReadController {
             // 定义 Sheet 名称和数据列表
             String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率"};
 
-            // 99线
-            // 创建工作表
-            XSSFSheet sheet = workbook.createSheet(sheetNames[0]);
-            // 写入数据
-            createP99ModelsData(sheet, p99Models);
-            // 3. 创建绘图对象
-            XSSFDrawing drawing = sheet.createDrawingPatriarch();
-            XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
-            // 4. 创建图表对象
-            XSSFChart chart = drawing.createChart(anchor);
-            chart.setTitleText("gateway 99线");
-            chart.setTitleOverlay(false);
-            // 5. 配置图表数据
-            configureP99ModelsChartData(chart, sheet);
+            createP99ModelSheet(workbook, sheetNames[0], p99Models, "gateway 99线", "日期", "99线", "99线");
+            createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
+            createSlowRequestRateModelSheet(workbook, sheetNames[2], slowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
+            createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
             // 6. 保存文件
             workbook.write(response.getOutputStream());
         } catch (Exception e) {
@@ -269,7 +260,81 @@ public class FileReadController {
         }
     }
 
-    private void configureP99ModelsChartData(XSSFChart chart, XSSFSheet sheet) {
+    private void createSlowRequestRateModelSheet(XSSFWorkbook workbook,
+                                                 String sheetName,
+                                                 List<SlowRequestRateModel> slowRequestRateModels,
+                                                 String titleText,
+                                                 String xTitle,
+                                                 String yTitle,
+                                                 String seriesTitle) {
+        // 创建工作表
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+        // 写入数据
+        createSlowRequestRateModelsData(workbook, sheet, slowRequestRateModels);
+        // 3. 创建绘图对象
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
+        // 4. 创建图表对象
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText(titleText);
+        chart.setTitleOverlay(false);
+        // 5. 配置图表数据
+        configureP99ModelsChartData(chart, sheet, xTitle, yTitle, seriesTitle);
+
+    }
+
+    private void createSlowRequestRateModelsData(XSSFWorkbook workbook,
+                                                 XSSFSheet sheet,
+                                                 List<SlowRequestRateModel> slowRequestRateModels) {
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("日期");
+        headerRow.createCell(1).setCellValue("慢请求率");
+
+        // 填充数据行
+        List<String> dates = slowRequestRateModels.stream().map(SlowRequestRateModel::getDate).collect(Collectors.toList());
+        List<Double> slowRequestRateValues = slowRequestRateModels.stream().map(SlowRequestRateModel::getSlowRequestRate).collect(Collectors.toList());
+        // 创建百分比格式
+        DataFormat dataFormat = workbook.createDataFormat();
+        short percentageFormat = dataFormat.getFormat("0.00%");
+        CellStyle percentageCellStyle = workbook.createCellStyle();
+        percentageCellStyle.setDataFormat(percentageFormat);
+        for (int i = 0; i < dates.size(); i++) {
+            Row row = sheet.createRow(i + 1);
+            row.createCell(0).setCellValue(dates.get(i));
+            Cell cell = row.createCell(1);
+            cell.setCellValue(slowRequestRateValues.get(i));
+            cell.setCellStyle(percentageCellStyle);
+        }
+    }
+
+    private void createP99ModelSheet(XSSFWorkbook workbook,
+                                     String sheetName,
+                                     List<P99Model> p99Models,
+                                     String titleText,
+                                     String xTitle,
+                                     String yTitle,
+                                     String seriesTitle) {
+        // 99线
+        // 创建工作表
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+        // 写入数据
+        createP99ModelsData(sheet, p99Models);
+        // 3. 创建绘图对象
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
+        // 4. 创建图表对象
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText(titleText);
+        chart.setTitleOverlay(false);
+        // 5. 配置图表数据
+        configureP99ModelsChartData(chart, sheet, xTitle, yTitle, seriesTitle);
+    }
+
+    private void configureP99ModelsChartData(XSSFChart chart,
+                                             XSSFSheet sheet,
+                                             String xTitle,
+                                             String yTitle,
+                                             String seriesTitle) {
         // 1. 创建数据源引用
         int lastRowNum = sheet.getLastRowNum();
         CellRangeAddress categoryRange = new CellRangeAddress(1, lastRowNum, 0, 0);
@@ -288,13 +353,13 @@ public class FileReadController {
         // 3. 创建图表数据
         XDDFChartData data = chart.createData(
                 ChartTypes.LINE,
-                getChartAxis(chart, "日期"),
-                getValueAxis(chart, "99线")
+                getChartAxis(chart, xTitle),
+                getValueAxis(chart, yTitle)
         );
 
         // 4. 添加数据系列
         XDDFChartData.Series series = data.addSeries(categories, values);
-        series.setTitle("99线", null);
+        series.setTitle(seriesTitle, null);
         setLineStyle(series, PresetColor.YELLOW);
 
         // XDDFChartLegend legend = chart.getOrAddLegend();
