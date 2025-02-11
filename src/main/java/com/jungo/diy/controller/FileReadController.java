@@ -11,6 +11,7 @@ import org.apache.poi.xddf.usermodel.PresetColor;
 import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xssf.usermodel.*;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
+import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -296,8 +297,8 @@ public class FileReadController {
         series.setTitle("99线", null);
         setLineStyle(series, PresetColor.YELLOW);
 
-        // 5. 绘制图表
-        chart.plot(data);
+        // XDDFChartLegend legend = chart.getOrAddLegend();
+        // legend.setPosition(LegendPosition.TOP_RIGHT);
 
         // POI 5.2.3 及以上，启用数据标签的正确方式
         // **仅显示数据点的 Y 轴数值（不显示类别名、序列名等）**
@@ -309,6 +310,18 @@ public class FileReadController {
         // 不显示类别名称
         dLbls.addNewShowCatName().setVal(false);
         dLbls.addNewShowSerName().setVal(false);
+        // 标签位置设置为顶部
+        // 尝试设置标签位置为顶部
+        try {
+            dLbls.addNewDLblPos().setVal(STDLblPos.T);
+        } catch (Exception e) {
+            // 处理异常，可能是由于模式文件缺失或其他原因
+            System.err.println("Failed to set data label position: " + e.getMessage());
+        }
+
+        // 5. 绘制图表
+        chart.plot(data);
+
 
     }
 
