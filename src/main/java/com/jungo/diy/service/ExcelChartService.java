@@ -27,7 +27,7 @@ public class ExcelChartService {
         
         // 2. 创建图表表
         XSSFSheet chartSheet = workbook.createSheet("99线周维度-图表");
-        createLineChart(workbook, dataSheet, chartSheet);
+        createLineChart(dataSheet, chartSheet);
         
         return workbook;
     }
@@ -49,7 +49,7 @@ public class ExcelChartService {
         }
     }
 
-    private static void createLineChart(XSSFWorkbook workbook, XSSFSheet dataSheet, XSSFSheet chartSheet) {
+    private static void createLineChart(XSSFSheet dataSheet, XSSFSheet chartSheet) {
         XSSFDrawing drawing = chartSheet.createDrawingPatriarch();
         XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 0, 5, 15, 25);
         
@@ -60,22 +60,20 @@ public class ExcelChartService {
         XDDFCategoryAxis xAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
         XDDFValueAxis yAxis = chart.createValueAxis(AxisPosition.LEFT);
         yAxis.setTitle("99线");
+        // 配置横坐标
+        xAxis.setTitle("日期");
         
         // 定义数据范围
-        // 第一列数据作为
+        int lastRowNum = dataSheet.getLastRowNum();
         XDDFDataSource<String> xData = XDDFDataSourcesFactory.fromStringCellRange(dataSheet,
-            new CellRangeAddress(1, 8, 0, 0));
+            new CellRangeAddress(1, lastRowNum, 0, 0));
         XDDFNumericalDataSource<Double> yData = XDDFDataSourcesFactory.fromNumericCellRange(dataSheet,
-                new CellRangeAddress(1, 8, 1, 1));
+                new CellRangeAddress(1, lastRowNum, 1, 1));
 
         // 创建折线图数据
         XDDFLineChartData data = (XDDFLineChartData) chart.createData(ChartTypes.LINE, xAxis, yAxis);
         XDDFLineChartData.Series series = (XDDFLineChartData.Series) data.addSeries(xData, yData);
 
-        // 使用 CellReference 替代 XSSFCell
-        CellReference cellReference = new CellReference(dataSheet.getRow(0).getCell(1).getRowIndex(), dataSheet.getRow(0).getCell(1).getColumnIndex());
-        series.setTitle("销售额趋势", cellReference);
-        // 绘制图表
         chart.plot(data);
         // POI 5.2.3 及以上，启用数据标签的正确方式
         // **仅显示数据点的 Y 轴数值（不显示类别名、序列名等）**
