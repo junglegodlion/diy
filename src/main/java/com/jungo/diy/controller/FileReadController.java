@@ -2,24 +2,22 @@ package com.jungo.diy.controller;
 
 import com.jungo.diy.model.*;
 import com.jungo.diy.response.UrlPerformanceResponse;
-import com.jungo.diy.service.ExcelChartService;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xddf.usermodel.PresetColor;
+import org.apache.poi.xddf.usermodel.chart.*;
+import org.apache.poi.xssf.usermodel.*;
+import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,6 +25,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.jungo.diy.util.ExcelChartGenerator.*;
 
 
 /**
@@ -217,7 +217,11 @@ public class FileReadController {
 
 
     @PostMapping("/upload/getCharts")
-    public ResponseEntity<Resource> getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
+    public void getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
+        // 设置响应头
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment;filename=performance_chart.xlsx");
+
         String filename = file.getOriginalFilename();
         if (Objects.isNull(filename)) {
             throw new IllegalArgumentException("文件名为空");
@@ -230,31 +234,145 @@ public class FileReadController {
             throw new IllegalArgumentException("不支持的文件类型");
         }
 
+        // 99线
         List<P99Model> p99Models = getP99Models(data);
+        // 周维度99线
         List<P99Model> averageP99Models = getAverageP99Models(p99Models);
+        // 慢请求率
+        List<SlowRequestRateModel> slowRequestRateModels = getSlowRequestRateModels(data);
+        // 周维度慢请求率
+        List<SlowRequestRateModel> averageSlowRequestRateModels = getAverageSlowRequestRateModels(slowRequestRateModels);
+        // 画图
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            // 定义 Sheet 名称和数据列表
+            String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率"};
 
+            // 99线
+            // 创建工作表
+            XSSFSheet sheet = workbook.createSheet(sheetNames[0]);
+            // 写入数据
+            createP99ModelsData(sheet, p99Models);
+            // 3. 创建绘图对象
+            XSSFDrawing drawing = sheet.createDrawingPatriarch();
+            XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
+            // 4. 创建图表对象
+            XSSFChart chart = drawing.createChart(anchor);
+            chart.setTitleText("gateway 99线");
+            chart.setTitleOverlay(false);
+            // 5. 配置图表数据
+            configureP99ModelsChartData(chart, sheet);
+            // 6. 保存文件
+            workbook.write(response.getOutputStream());
+        } catch (Exception e) {
+            log.error("FileReadController#getCharts,出现异常！", e);
+        }
+    }
 
-        // 1. 生成工作簿
-        XSSFWorkbook workbook = ExcelChartService.generateExcelWithChart(averageP99Models);
+    private void configureP99ModelsChartData(XSSFChart chart, XSSFSheet sheet) {
+        // 1. 创建数据源引用
+        int lastRowNum = sheet.getLastRowNum();
+        CellRangeAddress categoryRange = new CellRangeAddress(1, lastRowNum, 0, 0);
+        CellRangeAddress valueRange = new CellRangeAddress(1, lastRowNum, 1, 1);
 
-        // 2. 转换为字节流
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        workbook.write(bos);
-        workbook.close();
+        // 2. 创建数据源
+        XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
+                sheet,
+                categoryRange
+        );
+        XDDFNumericalDataSource<Double> values = XDDFDataSourcesFactory.fromNumericCellRange(
+                sheet,
+                valueRange
+        );
 
-        // 3. 封装为Resource
-        byte[] bytes = bos.toByteArray();
-        ByteArrayResource resource = new ByteArrayResource(bytes);
+        // 3. 创建图表数据
+        XDDFChartData data = chart.createData(
+                ChartTypes.LINE,
+                getChartAxis(chart, "日期"),
+                getValueAxis(chart, "99线")
+        );
 
-        // 4. 设置响应头
-        HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=week_99line_chart.xlsx");
+        // 4. 添加数据系列
+        XDDFChartData.Series series = data.addSeries(categories, values);
+        series.setTitle("99线", null);
+        setLineStyle(series, PresetColor.YELLOW);
 
-        return ResponseEntity.ok()
-                .headers(headers)
-                .contentLength(bytes.length)
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .body(resource);
+        // 5. 绘制图表
+        chart.plot(data);
+
+        // POI 5.2.3 及以上，启用数据标签的正确方式
+        // **仅显示数据点的 Y 轴数值（不显示类别名、序列名等）**
+        CTDLbls dLbls = chart.getCTChart().getPlotArea().getLineChartArray(0).getSerArray(0).addNewDLbls();
+        // 仅显示数值
+        dLbls.addNewShowVal().setVal(true);
+        // 不显示图例键
+        dLbls.addNewShowLegendKey().setVal(false);
+        // 不显示类别名称
+        dLbls.addNewShowCatName().setVal(false);
+        dLbls.addNewShowSerName().setVal(false);
+
+    }
+
+    private void createP99ModelsData(XSSFSheet sheet, List<P99Model> p99Models) {
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("日期");
+        headerRow.createCell(1).setCellValue("99线");
+
+        // 填充数据行
+        List<String> dates = p99Models.stream().map(P99Model::getDate).collect(Collectors.toList());
+        List<Integer> p99Values = p99Models.stream().map(P99Model::getP99).collect(Collectors.toList());
+
+        for (int i = 0; i < dates.size(); i++) {
+            Row row = sheet.createRow(i + 1);
+            row.createCell(0).setCellValue(dates.get(i));
+            row.createCell(1).setCellValue(p99Values.get(i));
+        }
+
+    }
+
+    private List<SlowRequestRateModel> getAverageSlowRequestRateModels(List<SlowRequestRateModel> slowRequestRateModels) {
+        // 将slowRequestRateModels按照周数分组，计算平均值
+        Map<Integer, List<SlowRequestRateModel>> groupedSlowRequestRateModels = slowRequestRateModels.stream().collect(Collectors.groupingBy(SlowRequestRateModel::getPeriod));
+        List<SlowRequestRateModel> averageSlowRequestRateModels = new ArrayList<>();
+        for (Map.Entry<Integer, List<SlowRequestRateModel>> entry : groupedSlowRequestRateModels.entrySet()) {
+            List<SlowRequestRateModel> slowRequestRateModelList = entry.getValue();
+
+            // 计算平均慢请求率
+            double sum = slowRequestRateModelList.stream().mapToDouble(SlowRequestRateModel::getSlowRequestRate).sum();
+            double average = sum / slowRequestRateModelList.size();
+            SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
+
+            // 设置2025年第2周（ISO标准周计算）
+            LocalDate date = LocalDate.of(2025,  1, 1)
+                    .with(WeekFields.ISO.weekOfYear(),  entry.getKey())
+                    .with(WeekFields.ISO.dayOfWeek(),  3); // 周三
+
+            slowRequestRateModel.setDate(date.format(DateTimeFormatter.ISO_DATE));
+            slowRequestRateModel.setPeriod(entry.getKey());
+            slowRequestRateModel.setSlowRequestRate(average);
+            averageSlowRequestRateModels.add(slowRequestRateModel);
+        }
+        return averageSlowRequestRateModels;
+    }
+
+    private List<SlowRequestRateModel> getSlowRequestRateModels(ExcelModel data) {
+        List<List<String>> dataLists = data.getSheetModels().get(0).getData();
+        List<SlowRequestRateModel> slowRequestRateModels = new ArrayList<>();
+        // 使用ISO周规则计算周数
+        WeekFields weekFields = WeekFields.ISO;
+        // 写入数据
+        for (int i = 0; i < dataLists.size() - 1; i++) {
+            List<String> list = dataLists.get(i + 1);
+            String dateString = list.get(0);
+            double dateDouble = Double.parseDouble(dateString);
+            LocalDate localDate = getLocalDate(dateDouble);
+            int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
+            SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
+            slowRequestRateModel.setDate(getDateString(dateDouble));
+            slowRequestRateModel.setPeriod(weekNumber);
+            slowRequestRateModel.setSlowRequestRate(Float.parseFloat(list.get(1)));
+            slowRequestRateModels.add(slowRequestRateModel);
+        }
+        return slowRequestRateModels;
     }
 
     private static List<P99Model> getAverageP99Models(List<P99Model> p99Models) {
