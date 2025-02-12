@@ -165,6 +165,7 @@ public class FileReadController {
         List<String> qilinComponentInterface = new ArrayList<>();
         qilinComponentInterface.add("/cl-maint-api/activity/getProducts");
         qilinComponentInterface.add("/cl-maint-api/greatValueCard/getActivityCards");
+        qilinComponentInterface.add("/cl-maint-api/activity/getSpikeDynamicPackages");
         qilinComponentInterface.add("/cl-tire-site/activityPage/getKylinActivityPageProductList");
         qilinComponentInterface.add("/ext-website-cl-beauty-api/beautyKylin/getShopList");
         qilinComponentInterface.add("/cl-car-product-api/Product/getChannelActivityComponent");
