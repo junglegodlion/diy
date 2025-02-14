@@ -295,6 +295,9 @@ public class FileReadController {
         // 3. 创建绘图对象
         XSSFDrawing drawing = sheet.createDrawingPatriarch();
         XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
+        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
+        int endCol = anchor.getCol1() + chartWidthCols;
+        anchor.setCol2(anchor.getCol1() + endCol);
         // 4. 创建图表对象
         XSSFChart chart = drawing.createChart(anchor);
         chart.setTitleText(titleText);
@@ -343,6 +346,9 @@ public class FileReadController {
         // 3. 创建绘图对象
         XSSFDrawing drawing = sheet.createDrawingPatriarch();
         XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
+        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
+        int endCol = anchor.getCol1() + chartWidthCols;
+        anchor.setCol2(anchor.getCol1() + endCol);
         // 4. 创建图表对象
         XSSFChart chart = drawing.createChart(anchor);
         chart.setTitleText(titleText);
