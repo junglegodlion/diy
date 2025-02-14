@@ -5,6 +5,7 @@ import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormat;
@@ -16,6 +17,7 @@ import org.apache.poi.xssf.usermodel.*;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
 import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -240,14 +242,14 @@ public class FileReadController {
             throw new IllegalArgumentException("不支持的文件类型");
         }
 
-        // 99线
-        List<P99Model> p99Models = getP99Models(data);
+        // 99线-指定日期 如“2025-02-01”
+        List<P99Model> p99Models = getAllP99Models(data, "2025-02-01");
         // 周维度99线
-        List<P99Model> averageP99Models = getAverageP99Models(p99Models);
+        List<P99Model> averageP99Models = getAverageP99Models(getAllP99Models(data, null));
         // 慢请求率
-        List<SlowRequestRateModel> slowRequestRateModels = getSlowRequestRateModels(data);
+        List<SlowRequestRateModel> slowRequestRateModels = getSlowRequestRateModels(data, "2025-02-01");
         // 周维度慢请求率
-        List<SlowRequestRateModel> averageSlowRequestRateModels = getAverageSlowRequestRateModels(slowRequestRateModels);
+        List<SlowRequestRateModel> averageSlowRequestRateModels = getAverageSlowRequestRateModels(getSlowRequestRateModels(data, null));
         // 画图
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             // 定义 Sheet 名称和数据列表
@@ -462,7 +464,12 @@ public class FileReadController {
         return averageSlowRequestRateModels;
     }
 
-    private List<SlowRequestRateModel> getSlowRequestRateModels(ExcelModel data) {
+    private List<SlowRequestRateModel> getSlowRequestRateModels(ExcelModel data, String dateStr) {
+        LocalDate specifyDate = null;
+        if (StringUtils.isNotBlank(dateStr)) {
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
+            specifyDate = LocalDate.parse(dateStr, formatter);
+        }
         List<List<String>> dataLists = data.getSheetModels().get(0).getData();
         List<SlowRequestRateModel> slowRequestRateModels = new ArrayList<>();
         // 使用ISO周规则计算周数
@@ -473,6 +480,9 @@ public class FileReadController {
             String dateString = list.get(0);
             double dateDouble = Double.parseDouble(dateString);
             LocalDate localDate = getLocalDate(dateDouble);
+            if (specifyDate != null && localDate.isBefore(specifyDate)) {
+                continue;
+            }
             int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
             SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
             slowRequestRateModel.setDate(getDateString(dateDouble));
@@ -506,7 +516,12 @@ public class FileReadController {
         return averageP99Models;
     }
 
-    private static List<P99Model> getP99Models(ExcelModel data) {
+    private static List<P99Model> getAllP99Models(ExcelModel data, String dateStr) {
+        LocalDate specifyDate = null;
+        if (StringUtils.isNotBlank(dateStr)) {
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
+            specifyDate = LocalDate.parse(dateStr, formatter);
+        }
         List<List<String>> dataLists = data.getSheetModels().get(0).getData();
         List<P99Model> p99Models = new ArrayList<>();
         // 使用ISO周规则计算周数
@@ -517,6 +532,9 @@ public class FileReadController {
             String dateString = list.get(0);
             double dateDouble = Double.parseDouble(dateString);
             LocalDate localDate = getLocalDate(dateDouble);
+            if (specifyDate != null && localDate.isBefore(specifyDate)) {
+                continue;
+            }
             int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
             P99Model p99Model = new P99Model();
             p99Model.setDate(getDateString(dateDouble));
