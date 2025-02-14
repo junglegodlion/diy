@@ -22,8 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.WeekFields;
@@ -254,6 +257,23 @@ public class FileReadController {
             createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
             createSlowRequestRateModelSheet(workbook, sheetNames[2], slowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
             createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
+
+            // 拼接完整的文件路径
+            // 获取当天日期并格式化为 yyyy-MM-dd 格式
+            LocalDate currentDate = LocalDate.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            String formattedDate = currentDate.format(formatter);
+            String fileName = URLEncoder.encode(formattedDate + "_chart.xlsx", StandardCharsets.UTF_8.toString());
+            String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/图表";
+            String filePath = directoryPath + "/" + fileName;
+
+            // 写入文件
+            try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+                workbook.write(fileOut);
+            } catch (IOException e) {
+                log.error("ExportService#exportToExcel,出现异常！", e);
+            }
+
             // 6. 保存文件
             workbook.write(response.getOutputStream());
         } catch (Exception e) {
@@ -352,10 +372,13 @@ public class FileReadController {
         );
 
         // 3. 创建图表数据
+        XDDFValueAxis yAxis = getValueAxis(chart, yTitle);
+        // 新增：隐藏Y轴主体
+        yAxis.setVisible(false);
         XDDFChartData data = chart.createData(
                 ChartTypes.LINE,
                 getChartAxis(chart, xTitle),
-                getValueAxis(chart, yTitle)
+                yAxis
         );
 
         // 4. 添加数据系列
