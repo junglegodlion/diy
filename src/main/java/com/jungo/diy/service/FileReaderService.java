@@ -1,6 +1,8 @@
 package com.jungo.diy.service;
 
 
+import com.jungo.diy.model.PerformanceFileModel;
+import com.jungo.diy.model.PerformanceFolderModel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -41,23 +43,30 @@ public class FileReaderService {
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
             throw new IllegalArgumentException("目录不存在或不是文件夹");
         }
-        List<List<List<String>>> data = new ArrayList<>();
+        PerformanceFolderModel performanceFolderModel = new PerformanceFolderModel();
+        performanceFolderModel.setFolderName(targetDir);
+        List<PerformanceFileModel> files = new ArrayList<>();
+        performanceFolderModel.setFiles(files);
+
         try (Stream<Path> paths = Files.list(dirPath)) {
             paths.filter(Files::isRegularFile)
                     .limit(4)
                     .forEach(path -> {
                         try {
-                            Path fileName = path.getFileName();
-                            List<List<String>> sheetData = new ArrayList<>();
+                            String fileName = path.getFileName().toString();
+                            PerformanceFileModel performanceFileModel = new PerformanceFileModel();
+                            performanceFileModel.setFileName(fileName);
                             String str = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
                             String[] lines = str.split("\\R");
+                            List<List<String>> data = new ArrayList<>();
+                            performanceFileModel.setData(data);
                             for (String line : lines) {
                                 // 去除首尾空格后按逗号分割（支持逗号前后有空格）
                                 String[] parts = line.trim().split("\\s*,\\s*");
                                 List<String> collect = Arrays.stream(parts).map(String::trim).collect(Collectors.toList());
-                                sheetData.add(collect);
+                                data.add(collect);
                             }
-                            data.add(sheetData);
+                            files.add(performanceFileModel);
 
                         } catch (IOException e) {
                             log.error("FileReaderService#readTargetFiles,出现异常！", e);
