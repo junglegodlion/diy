@@ -3,9 +3,7 @@ package com.jungo.diy.controller;
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
 import com.jungo.diy.service.ApiDailyPerformanceService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -19,8 +17,14 @@ public class ApiDailyPerformanceController {
     @Autowired
     private ApiDailyPerformanceService apiDailyPerformanceService;
 
-    @GetMapping
+    @GetMapping("/listApiDailyPerformanceEntities")
     public List<ApiDailyPerformanceEntity> listApiDailyPerformanceEntities() {
         return apiDailyPerformanceService.getAllApiDailyPerformanceEntities();
+    }
+
+    @PostMapping("/createApiDailyPerformance")
+    public String createApiDailyPerformance(@RequestBody ApiDailyPerformanceEntity apiDailyPerformance) {
+        apiDailyPerformanceService.addApiDailyPerformance(apiDailyPerformance);
+        return "success";
     }
 }

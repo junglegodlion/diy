@@ -20,4 +20,8 @@ public class ApiDailyPerformanceService {
     public List<ApiDailyPerformanceEntity> getAllApiDailyPerformanceEntities() {
         return apiDailyPerformanceMapper.findAll();
     }
+
+    public void addApiDailyPerformance(ApiDailyPerformanceEntity apiDailyPerformance) {
+        apiDailyPerformanceMapper.insert(apiDailyPerformance);
+    }
 }

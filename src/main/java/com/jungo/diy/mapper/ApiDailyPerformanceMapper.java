@@ -16,4 +16,6 @@ public interface ApiDailyPerformanceMapper {
     // 查询所有用户
     @Select("SELECT * FROM api_daily_performance")
     List<ApiDailyPerformanceEntity> findAll();
+
+    int insert(ApiDailyPerformanceEntity apiDailyPerformance);
 }
