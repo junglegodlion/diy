@@ -1,18 +1,21 @@
 package com.jungo.diy.service;
 
 
+import com.jungo.diy.entity.ApiDailyPerformanceEntity;
+import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.model.PerformanceFileModel;
 import com.jungo.diy.model.PerformanceFolderModel;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,6 +27,9 @@ public class FileReaderService {
 
     @Value("${file.storage.dir}")
     private String targetDir;
+
+    @Autowired
+    ApiDailyPerformanceMapper apiDailyPerformanceMapper;
 
     public String readTargetFiles() {
         // 校验路径是否为空或包含非法字符
@@ -54,6 +60,8 @@ public class FileReaderService {
                     .forEach(path -> {
                         try {
                             String fileName = path.getFileName().toString();
+                            // fileName去除.csv后缀
+                            fileName = fileName.substring(0, fileName.length() - 4);
                             PerformanceFileModel performanceFileModel = new PerformanceFileModel();
                             performanceFileModel.setFileName(fileName);
                             String str = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
@@ -64,7 +72,10 @@ public class FileReaderService {
                                 // 去除首尾空格后按逗号分割（支持逗号前后有空格）
                                 String[] parts = line.trim().split("\\s*,\\s*");
                                 List<String> collect = Arrays.stream(parts).map(String::trim).collect(Collectors.toList());
-                                data.add(collect);
+                                boolean checkListForSlash = checkListForSlash(collect);
+                                if (checkListForSlash) {
+                                    data.add(collect);
+                                }
                             }
                             files.add(performanceFileModel);
 
@@ -76,6 +87,75 @@ public class FileReaderService {
         } catch (IOException e) {
             throw new RuntimeException("目录访问失败", e);
         }
+
+        // 将性能数据写入数据库
+        writeDataToDatabase(performanceFolderModel);
         return "success";
+    }
+
+    public static boolean checkListForSlash(List<String> list) {
+        int count = 0;
+
+        // 遍历list，统计包含 "/" 的字符串个数
+        for (String str : list) {
+            if (str.contains("/") || str.contains("=")) {
+                count++;
+            }
+            if (count > 1) {
+                return false; // 如果有2个及以上的字符串包含 "/"，返回false
+            }
+        }
+
+        // 如果列表中包含"/"的字符串不超过一个，返回true
+        return true;
+    }
+
+    public static boolean containsSlash(String str) {
+        // indexOf返回字符首次出现的位置，若不存在则返回 -1
+        return str.contains("/");
+    }
+
+    private void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
+        String folderName = performanceFolderModel.getFolderName();
+        // folderName转化成Date
+        // 创建SimpleDateFormat实例，并指定日期格式
+        Date date = getDateFromString(folderName);
+        Map<String, List<List<String>>> map = performanceFolderModel.getFiles().stream().collect(Collectors.toMap(PerformanceFileModel::getFileName, PerformanceFileModel::getData));
+        // 慢查询文件
+        List<List<String>> slowRequestSheetModel = map.get("慢查询");
+        Map<String, Integer> slowRequestSheetModelMap = slowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0) + x.get(1), x -> Integer.parseInt(x.get(2)), (x, y) -> x));
+        // 请求情况文件
+        List<List<String>> requestSheetModel = map.get("请求情况");
+
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = new ArrayList<>();
+        for (List<String> list : requestSheetModel) {
+            ApiDailyPerformanceEntity apiDailyPerformanceEntity = new ApiDailyPerformanceEntity();
+            apiDailyPerformanceEntity.setDate(date);
+            apiDailyPerformanceEntity.setHost(list.get(0));
+            apiDailyPerformanceEntity.setUrl(list.get(1));
+            apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(2)));
+            apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(3)));
+            apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(4)));
+            apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(5)));
+            apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(6)));
+            apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(7)));
+            apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0) + list.get(1), 0));
+            apiDailyPerformanceEntities.add(apiDailyPerformanceEntity);
+        }
+        apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
+    }
+
+    private static Date getDateFromString(String folderName) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+        try {
+            // 使用parse()方法将String转换为Date
+            return dateFormat.parse(folderName);
+
+        } catch (ParseException e) {
+            log.error("FileReaderService#writeDataToDatabase,出现异常！", e);
+        }
+
+        return null;
     }
 }

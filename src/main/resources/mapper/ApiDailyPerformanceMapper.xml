@@ -11,4 +11,11 @@
         VALUES (#{host}, #{url}, #{p99}, #{p999}, #{p90}, #{p75}, #{p50}, #{totalRequestCount}, #{slowRequestCount}, #{date})
     </insert>
 
+    <insert id="batchInsert">
+        INSERT INTO api_daily_performance(host, url, p99, p999, p90, p75, p50, totalRequestCount, slowRequestCount, date)
+        VALUES
+        <foreach collection="list" item="item" index="index" separator=",">
+            (#{item.host}, #{item.url}, #{item.p99}, #{item.p999}, #{item.p90}, #{item.p75}, #{item.p50}, #{item.totalRequestCount}, #{item.slowRequestCount}, #{item.date})
+        </foreach>
+    </insert>
 </mapper>

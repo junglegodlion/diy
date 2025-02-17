@@ -18,4 +18,6 @@ public interface ApiDailyPerformanceMapper {
     List<ApiDailyPerformanceEntity> findAll();
 
     int insert(ApiDailyPerformanceEntity apiDailyPerformance);
+
+    int batchInsert(List<ApiDailyPerformanceEntity> list);
 }

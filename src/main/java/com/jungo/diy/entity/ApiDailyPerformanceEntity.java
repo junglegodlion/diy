@@ -20,10 +20,11 @@ public class ApiDailyPerformanceEntity {
     private String host;
     // url
     private String url;
-    // 99线
-    private Integer p99;
     // 999线
     private Integer p999;
+    // 99线
+    private Integer p99;
+
     // 90线
     private Integer p90;
     // 75线
