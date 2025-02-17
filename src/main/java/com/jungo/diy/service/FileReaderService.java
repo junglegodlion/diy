@@ -1,6 +1,7 @@
 package com.jungo.diy.service;
 
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -8,11 +9,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
+@Slf4j
 public class FileReaderService {
     // 指定本地路径（Windows格式）
     private static final String PREFIX = "C:\\Users\\Lichuang3\\Desktop\\备份\\c端网关接口性能统计\\数据收集\\";
@@ -20,7 +23,7 @@ public class FileReaderService {
     @Value("${file.storage.dir}")
     private String targetDir;
 
-    public List<String> readTargetFiles() {
+    public String readTargetFiles() {
         // 校验路径是否为空或包含非法字符
         if (targetDir == null || targetDir.trim().isEmpty()) {
             throw new IllegalArgumentException("目标目录不能为空");
@@ -38,20 +41,32 @@ public class FileReaderService {
         if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
             throw new IllegalArgumentException("目录不存在或不是文件夹");
         }
-
+        List<List<List<String>>> data = new ArrayList<>();
         try (Stream<Path> paths = Files.list(dirPath)) {
-            return paths.filter(Files::isRegularFile)
+            paths.filter(Files::isRegularFile)
                     .limit(4)
-                    .map(path -> {
+                    .forEach(path -> {
                         try {
-                            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+                            Path fileName = path.getFileName();
+                            List<List<String>> sheetData = new ArrayList<>();
+                            String str = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+                            String[] lines = str.split("\\R");
+                            for (String line : lines) {
+                                // 去除首尾空格后按逗号分割（支持逗号前后有空格）
+                                String[] parts = line.trim().split("\\s*,\\s*");
+                                List<String> collect = Arrays.stream(parts).map(String::trim).collect(Collectors.toList());
+                                sheetData.add(collect);
+                            }
+                            data.add(sheetData);
+
                         } catch (IOException e) {
-                            return "读取失败：" + path.getFileName();
+                            log.error("FileReaderService#readTargetFiles,出现异常！", e);
                         }
-                    })
-                    .collect(Collectors.toList());
+                    });
+
         } catch (IOException e) {
             throw new RuntimeException("目录访问失败", e);
         }
+        return "success";
     }
 }
