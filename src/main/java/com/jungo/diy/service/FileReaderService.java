@@ -19,6 +19,7 @@ public class FileReaderService {
 
     @Value("${file.storage.dir}")
     private String targetDir;
+
     public List<String> readTargetFiles() {
         // 校验路径是否为空或包含非法字符
         if (targetDir == null || targetDir.trim().isEmpty()) {
@@ -34,16 +35,16 @@ public class FileReaderService {
         }
 
         // 路径校验
-        if (!Files.exists(dirPath)  || !Files.isDirectory(dirPath))  {
+        if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
             throw new IllegalArgumentException("目录不存在或不是文件夹");
         }
 
-        try (Stream<Path> paths = Files.list(dirPath))  {
+        try (Stream<Path> paths = Files.list(dirPath)) {
             return paths.filter(Files::isRegularFile)
                     .limit(4)
                     .map(path -> {
                         try {
-                            return new String(Files.readAllBytes(path),  StandardCharsets.UTF_8);
+                            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
                         } catch (IOException e) {
                             return "读取失败：" + path.getFileName();
                         }
