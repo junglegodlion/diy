@@ -6,6 +6,7 @@ import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.model.PerformanceFileModel;
 import com.jungo.diy.model.PerformanceFolderModel;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.nio.file.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -27,6 +29,11 @@ public class FileReaderService {
 
     @Value("${file.storage.dir}")
     private String targetDir;
+
+    // 正则表达式预编译
+    // 必须包含至少一个 -：通过正向预查 (?=.*-) 实现
+    // 仅允许英文字母和 -：通过字符集 [A-Za-z-] 控制（需注意 - 在正则中需放在末尾避免歧义）
+    private static final Pattern PATTERN = Pattern.compile("^(?=.*-)[A-Za-z-]+$");
 
     @Autowired
     ApiDailyPerformanceMapper apiDailyPerformanceMapper;
@@ -71,7 +78,7 @@ public class FileReaderService {
                             for (String line : lines) {
                                 // 去除首尾空格后按逗号分割（支持逗号前后有空格）
                                 String[] parts = line.trim().split("\\s*,\\s*");
-                                List<String> collect = Arrays.stream(parts).map(String::trim).collect(Collectors.toList());
+                                List<String> collect = Arrays.stream(parts).map(String::trim).map(FileReaderService::cleanSpecialQuotes).collect(Collectors.toList());
                                 boolean checkListForSlash = checkListForSlash(collect);
                                 if (checkListForSlash) {
                                     data.add(collect);
@@ -93,6 +100,19 @@ public class FileReaderService {
         return "success";
     }
 
+    // 同时处理转义双引号和常规双引号
+    public static String cleanSpecialQuotes(String input) {
+        return StringUtils.strip(input,  "\"");
+    }
+
+
+    /**
+     * 检查字符串列表中是否最多只有一个字符串包含 "/"
+     * 此方法用于确保列表中包含"/"的字符串数量不超过一个
+     *
+     * @param list 待检查的字符串列表
+     * @return 如果列表中包含"/"的字符串不超过一个，则返回true；否则返回false
+     */
     public static boolean checkListForSlash(List<String> list) {
         int count = 0;
 
@@ -129,20 +149,41 @@ public class FileReaderService {
 
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = new ArrayList<>();
         for (List<String> list : requestSheetModel) {
-            ApiDailyPerformanceEntity apiDailyPerformanceEntity = new ApiDailyPerformanceEntity();
-            apiDailyPerformanceEntity.setDate(date);
-            apiDailyPerformanceEntity.setHost(list.get(0));
-            apiDailyPerformanceEntity.setUrl(list.get(1));
-            apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(2)));
-            apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(3)));
-            apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(4)));
-            apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(5)));
-            apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(6)));
-            apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(7)));
-            apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0) + list.get(1), 0));
-            apiDailyPerformanceEntities.add(apiDailyPerformanceEntity);
+            String url = list.get(1);
+            if (checkUrl(url)) {
+                ApiDailyPerformanceEntity apiDailyPerformanceEntity = new ApiDailyPerformanceEntity();
+                apiDailyPerformanceEntity.setDate(date);
+                apiDailyPerformanceEntity.setHost(list.get(0));
+                apiDailyPerformanceEntity.setUrl(url);
+                apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(2)));
+                apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(3)));
+                apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(4)));
+                apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(5)));
+                apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(6)));
+                apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(7)));
+                apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0) + list.get(1), 0));
+                apiDailyPerformanceEntities.add(apiDailyPerformanceEntity);
+            }
         }
         apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
+    }
+
+    private boolean checkUrl(String path) {
+        if (StringUtils.isBlank(path)) {
+            return false;
+        }
+
+        // 1. 去除首部斜杠（适配不同路径格式）
+        String trimmedPath = path.startsWith("/")  ? path.substring(1)  : path;
+
+        // 2. 按斜杠分割路径
+        String[] segments = trimmedPath.split("/");
+
+        if (segments.length < 1) {
+            return false;
+        }
+        String input = segments[0];
+        return input != null && PATTERN.matcher(input).matches();
     }
 
     private static Date getDateFromString(String folderName) {
