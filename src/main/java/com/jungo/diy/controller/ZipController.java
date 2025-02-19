@@ -8,9 +8,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.zip.ZipEntry;
@@ -21,6 +23,42 @@ import java.util.zip.ZipInputStream;
  */
 @RestController
 public class ZipController {
+
+    /**
+     * 处理 ZIP 文件读取
+     *
+     * @param file 上传的 ZIP 文件
+     * @return 解压结果信息
+     */
+    @PostMapping("/read-zip")
+    public String readZip(@RequestParam("file") MultipartFile file) throws IOException {
+        try (ZipInputStream zipInputStream = new ZipInputStream(file.getInputStream())) {
+            processZipEntries(zipInputStream);
+            return "Zip processed successfully";
+        }
+    }
+
+    private void processZipEntries(ZipInputStream zipInputStream) throws IOException {
+        ZipEntry entry;
+        while ((entry = zipInputStream.getNextEntry()) != null) {
+            if (!entry.isDirectory()) {
+                // 处理单个文件（示例：读取文本内容）
+                String content = readEntryContent(zipInputStream);
+                System.out.println("File:  " + entry.getName() + " | Content: " + content);
+            }
+            zipInputStream.closeEntry();
+        }
+    }
+
+    private String readEntryContent(ZipInputStream zis) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        int len;
+        while ((len = zis.read(buffer)) > 0) {
+            bos.write(buffer, 0, len);
+        }
+        return bos.toString(StandardCharsets.UTF_8.name());
+    }
 
     /**
      * 处理 ZIP 文件上传并解压
@@ -66,15 +104,15 @@ public class ZipController {
             return ResponseEntity.status(500).body("解压失败：" + e.getMessage());
         }
     }
- 
+
     // 文件提取方法（工具类可独立封装）
     private void extractFile(ZipInputStream zis, String filePath) throws IOException {
         try (BufferedOutputStream bos = new BufferedOutputStream(
-             new FileOutputStream(filePath))) {
+                new FileOutputStream(filePath))) {
             byte[] buffer = new byte[4096];
             int len;
-            while ((len = zis.read(buffer))  > 0) {
-                bos.write(buffer,  0, len);
+            while ((len = zis.read(buffer)) > 0) {
+                bos.write(buffer, 0, len);
             }
         }
     }
