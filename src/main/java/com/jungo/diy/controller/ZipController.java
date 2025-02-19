@@ -38,6 +38,11 @@ public class ZipController {
         }
     }
 
+    /**
+     * 处理 ZIP 文件条目
+     *
+     * @param zipInputStream ZIP 文件输入流
+     */
     private void processZipEntries(ZipInputStream zipInputStream) throws IOException {
         ZipEntry entry;
         while ((entry = zipInputStream.getNextEntry()) != null) {
@@ -50,6 +55,12 @@ public class ZipController {
         }
     }
 
+    /**
+     * 读取 ZIP 文件条目的内容
+     *
+     * @param zis ZIP 文件输入流
+     * @return 文件内容
+     */
     private String readEntryContent(ZipInputStream zis) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         byte[] buffer = new byte[1024];

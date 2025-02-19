@@ -7,9 +7,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * @author lichuang3
+ */
 @RestController
 @RequestMapping("/files")
-public class FileController {
+public class WriteToDBController {
     @Autowired
     private FileReaderService fileReaderService;
  
