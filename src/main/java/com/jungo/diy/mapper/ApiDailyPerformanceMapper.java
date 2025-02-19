@@ -2,8 +2,11 @@ package com.jungo.diy.mapper;
 
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -20,4 +23,6 @@ public interface ApiDailyPerformanceMapper {
     int insert(ApiDailyPerformanceEntity apiDailyPerformance);
 
     int batchInsert(List<ApiDailyPerformanceEntity> list);
+
+    List<ApiDailyPerformanceEntity> findUrl99Line(@Param("url")String url, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }

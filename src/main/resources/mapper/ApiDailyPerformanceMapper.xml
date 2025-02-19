@@ -2,6 +2,19 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!-- 映射语句 -->
 <mapper namespace="com.jungo.diy.mapper.ApiDailyPerformanceMapper">
+    <resultMap id="BaseResultMap" type="com.jungo.diy.entity.ApiDailyPerformanceEntity">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="host" property="host" jdbcType="VARCHAR"/>
+        <result column="url" property="url" jdbcType="VARCHAR"/>
+        <result column="p99" property="p99" jdbcType="INTEGER"/>
+        <result column="p999" property="p999" jdbcType="INTEGER"/>
+        <result column="p90" property="p90" jdbcType="INTEGER"/>
+        <result column="p75" property="p75" jdbcType="INTEGER"/>
+        <result column="p50" property="p50" jdbcType="INTEGER"/>
+        <result column="totalRequestCount" property="totalRequestCount" jdbcType="INTEGER"/>
+        <result column="slowRequestCount" property="slowRequestCount" jdbcType="INTEGER"/>
+        <result column="date" property="date" jdbcType="DATE"/>
+    </resultMap>
 
 
 
@@ -18,4 +31,8 @@
             (#{item.host}, #{item.url}, #{item.p99}, #{item.p999}, #{item.p90}, #{item.p75}, #{item.p50}, #{item.totalRequestCount}, #{item.slowRequestCount}, #{item.date})
         </foreach>
     </insert>
+
+    <select id="findUrl99Line" resultType="com.jungo.diy.entity.ApiDailyPerformanceEntity">
+        SELECT * FROM api_daily_performance WHERE url = #{url} AND date BETWEEN #{startDate} AND #{endDate}
+    </select>
 </mapper>

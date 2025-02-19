@@ -224,6 +224,10 @@ public class FileReadController {
     }
 
 
+    /**
+     * 处理文件上传并生成图表
+     * @author lichuang3
+     */
     @PostMapping("/upload/getCharts")
     public void getCharts(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
         // 设置响应头
@@ -333,7 +337,7 @@ public class FileReadController {
         }
     }
 
-    private void createP99ModelSheet(XSSFWorkbook workbook,
+    public static void createP99ModelSheet(XSSFWorkbook workbook,
                                      String sheetName,
                                      List<P99Model> p99Models,
                                      String titleText,
@@ -359,7 +363,7 @@ public class FileReadController {
         configureP99ModelsChartData(chart, sheet, xTitle, yTitle, seriesTitle);
     }
 
-    private void configureP99ModelsChartData(XSSFChart chart,
+    private static void configureP99ModelsChartData(XSSFChart chart,
                                              XSSFSheet sheet,
                                              String xTitle,
                                              String yTitle,
@@ -422,7 +426,7 @@ public class FileReadController {
 
     }
 
-    private void createP99ModelsData(XSSFSheet sheet, List<P99Model> p99Models) {
+    public static void createP99ModelsData(XSSFSheet sheet, List<P99Model> p99Models) {
         Row headerRow = sheet.createRow(0);
         headerRow.createCell(0).setCellValue("日期");
         headerRow.createCell(1).setCellValue("99线");
