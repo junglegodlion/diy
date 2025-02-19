@@ -8,7 +8,6 @@ import com.jungo.diy.model.PerformanceFolderModel;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -21,14 +20,14 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * @author lichuang3
+ */
 @Service
 @Slf4j
 public class FileReaderService {
     // 指定本地路径（Windows格式）
     private static final String PREFIX = "C:\\Users\\Lichuang3\\Desktop\\备份\\c端网关接口性能统计\\数据收集\\";
-
-    @Value("${file.storage.dir}")
-    private String targetDir;
 
     // 正则表达式预编译
     // 必须包含至少一个 -：通过正向预查 (?=.*-) 实现
@@ -38,16 +37,22 @@ public class FileReaderService {
     @Autowired
     ApiDailyPerformanceMapper apiDailyPerformanceMapper;
 
-    public String readTargetFiles() {
+    /**
+     * 读取指定目录下的文件，并将文件内容写入数据库
+     *
+     * @param directoryName 文件夹名称
+     * @return 操作结果
+     */
+    public String readTargetFiles(String directoryName) {
         // 校验路径是否为空或包含非法字符
-        if (targetDir == null || targetDir.trim().isEmpty()) {
+        if (directoryName == null || directoryName.trim().isEmpty()) {
             throw new IllegalArgumentException("目标目录不能为空");
         }
 
         // 尝试解析路径
         Path dirPath;
         try {
-            dirPath = Paths.get(PREFIX + targetDir);
+            dirPath = Paths.get(PREFIX + directoryName);
         } catch (InvalidPathException e) {
             throw new IllegalArgumentException("路径包含非法字符: " + e.getMessage());
         }
@@ -57,10 +62,11 @@ public class FileReaderService {
             throw new IllegalArgumentException("目录不存在或不是文件夹");
         }
         PerformanceFolderModel performanceFolderModel = new PerformanceFolderModel();
-        performanceFolderModel.setFolderName(targetDir);
+        performanceFolderModel.setFolderName(directoryName);
         List<PerformanceFileModel> files = new ArrayList<>();
         performanceFolderModel.setFiles(files);
 
+        // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
         try (Stream<Path> paths = Files.list(dirPath)) {
             paths.filter(Files::isRegularFile)
                     .limit(4)
