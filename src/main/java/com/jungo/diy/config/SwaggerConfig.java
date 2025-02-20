@@ -81,10 +81,10 @@ public class SwaggerConfig {
 
     private List<Parameter> setHeaderToken() {
         List<Parameter> pars = new ArrayList<>();
-        ParameterBuilder userId = new ParameterBuilder();
-        userId.name("token").description("用户TOKEN").modelRef(new ModelRef("string")).parameterType("header")
-                .required(true).build();
-        pars.add(userId.build());
+        // ParameterBuilder userId = new ParameterBuilder();
+        // userId.name("token").description("用户TOKEN").modelRef(new ModelRef("string")).parameterType("header")
+        //         .required(true).build();
+        // pars.add(userId.build());
         return pars;
     }
 }
