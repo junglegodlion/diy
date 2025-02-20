@@ -2,7 +2,9 @@ package com.jungo.diy.service;
 
 
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
+import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
+import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.PerformanceFileModel;
 import com.jungo.diy.model.PerformanceFolderModel;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +39,23 @@ public class FileReaderService {
     @Autowired
     ApiDailyPerformanceMapper apiDailyPerformanceMapper;
 
+    @Autowired
+    GateWayDailyPerformanceMapper gateWayDailyPerformanceMapper;
+
     /**
      * 读取指定目录下的文件，并将文件内容写入数据库
      *
-     * @param directoryName 文件夹名称
-     * @return 操作结果
+     * 主要流程：
+     * 1. 参数校验与路径解析
+     * 2. 创建文件夹数据模型
+     * 3. 读取目录下前4个普通文件
+     * 4. 解析文件内容并进行数据清洗
+     * 5. 将结构化数据持久化到数据库
+     *
+     * @param directoryName 目标文件夹名称（相对路径，不需要包含系统前缀）
+     * @return 固定返回"success"字符串表示操作成功，异常时会抛出运行时异常
+     * @throws IllegalArgumentException 当参数不合法或路径无效时抛出
+     * @throws RuntimeException 当目录访问失败时抛出
      */
     public String readTargetFiles(String directoryName) {
         // 校验路径是否为空或包含非法字符
@@ -78,6 +92,7 @@ public class FileReaderService {
                             PerformanceFileModel performanceFileModel = new PerformanceFileModel();
                             performanceFileModel.setFileName(fileName);
                             String str = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+
                             String[] lines = str.split("\\R");
                             List<List<String>> data = new ArrayList<>();
                             performanceFileModel.setData(data);
@@ -113,8 +128,8 @@ public class FileReaderService {
 
 
     /**
-     * 检查字符串列表中是否最多只有一个字符串包含 "/"
-     * 此方法用于确保列表中包含"/"的字符串数量不超过一个
+     * 检查字符串列表中是否最多只有一个字符串包含 "/"或"="
+     * 此方法用于确保列表中包含"/"或"="的字符串数量不超过一个
      *
      * @param list 待检查的字符串列表
      * @return 如果列表中包含"/"的字符串不超过一个，则返回true；否则返回false
@@ -136,11 +151,6 @@ public class FileReaderService {
         return true;
     }
 
-    public static boolean containsSlash(String str) {
-        // indexOf返回字符首次出现的位置，若不存在则返回 -1
-        return str.contains("/");
-    }
-
     private void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
         String folderName = performanceFolderModel.getFolderName();
         // folderName转化成Date
@@ -153,6 +163,40 @@ public class FileReaderService {
         // 请求情况文件
         List<List<String>> requestSheetModel = map.get("请求情况");
 
+        // 域名慢查询文件
+        List<List<String>> domainSlowRequestSheetModel = map.get("域名慢查询");
+        Map<String, Integer> domainSlowRequestSheetModelMap = domainSlowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));
+        // 域名请求情况文件
+        List<List<String>> domainRequestSheetModel = map.get("域名请求情况");
+        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntities(domainRequestSheetModel, date, domainSlowRequestSheetModelMap);
+        gateWayDailyPerformanceMapper.batchInsert(gateWayDailyPerformanceEntities);
+
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntities(requestSheetModel, date, slowRequestSheetModelMap);
+        apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
+    }
+
+    private List<GateWayDailyPerformanceEntity> getGateWayDailyPerformanceEntities(List<List<String>> domainRequestSheetModel,
+                                                                                   Date date,
+                                                                                   Map<String, Integer> domainSlowRequestSheetModelMap) {
+        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = new ArrayList<>();
+        for (List<String> list : domainRequestSheetModel) {
+            GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = new GateWayDailyPerformanceEntity();
+            gateWayDailyPerformanceEntity.setDate(date);
+            gateWayDailyPerformanceEntity.setHost(list.get(0));
+            gateWayDailyPerformanceEntity.setP999(Integer.parseInt(list.get(2)));
+            gateWayDailyPerformanceEntity.setP99(Integer.parseInt(list.get(3)));
+            gateWayDailyPerformanceEntity.setP90(Integer.parseInt(list.get(4)));
+            gateWayDailyPerformanceEntity.setP75(Integer.parseInt(list.get(5)));
+            gateWayDailyPerformanceEntity.setP50(Integer.parseInt(list.get(6)));
+            gateWayDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(1)));
+            gateWayDailyPerformanceEntity.setSlowRequestCount(domainSlowRequestSheetModelMap.getOrDefault(list.get(0), 0));
+            gateWayDailyPerformanceEntities.add(gateWayDailyPerformanceEntity);
+        }
+
+        return gateWayDailyPerformanceEntities;
+    }
+
+    private List<ApiDailyPerformanceEntity> getApiDailyPerformanceEntities(List<List<String>> requestSheetModel, Date date, Map<String, Integer> slowRequestSheetModelMap) {
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = new ArrayList<>();
         for (List<String> list : requestSheetModel) {
             String url = list.get(1);
@@ -171,7 +215,7 @@ public class FileReaderService {
                 apiDailyPerformanceEntities.add(apiDailyPerformanceEntity);
             }
         }
-        apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
+        return apiDailyPerformanceEntities;
     }
 
     private boolean checkUrl(String path) {
@@ -189,7 +233,7 @@ public class FileReaderService {
             return false;
         }
         String input = segments[0];
-        return input != null && PATTERN.matcher(input).matches();
+        return input != null && PATTERN.matcher(input).matches() && !path.contains("\\");
     }
 
     private static Date getDateFromString(String folderName) {
