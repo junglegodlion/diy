@@ -1,5 +1,6 @@
 package com.jungo.diy.controller;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,15 +8,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Enumeration;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
 /**
@@ -23,6 +23,51 @@ import java.util.zip.ZipInputStream;
  */
 @RestController
 public class ZipController {
+
+
+    @PostMapping("/read-level-zip")
+    public void readLevelZip(@RequestParam("file") MultipartFile file) throws IOException {
+        // 创建临时文件并自动清理
+        File tempFile = File.createTempFile("upload", ".zip");
+        try {
+            // 将上传文件写入临时文件
+            file.transferTo(tempFile);
+
+            try (ZipFile zipFile = new ZipFile(tempFile, Charset.forName("GBK"))) {
+                Enumeration<? extends ZipEntry> entries = zipFile.entries();
+                while (entries.hasMoreElements()) {
+                    ZipEntry entry = entries.nextElement();
+                    if (entry.isDirectory()) {
+                        processDirectoryFiles(zipFile, entry.getName());
+                    }
+                }
+            }
+        } finally {
+            // 确保删除临时文件
+            if (!tempFile.delete()) {
+                tempFile.deleteOnExit();
+            }
+        }
+    }
+
+    private void processDirectoryFiles(ZipFile zipFile, String dirPrefix) throws IOException {
+        Enumeration<? extends ZipEntry> allEntries = zipFile.entries();
+
+        while (allEntries.hasMoreElements()) {
+            ZipEntry fileEntry = allEntries.nextElement();
+
+            if (!fileEntry.isDirectory() &&
+                    fileEntry.getName().startsWith(dirPrefix) &&
+                    !fileEntry.getName().equals(dirPrefix)) {  // 排除目录自身
+
+                try (InputStream is = zipFile.getInputStream(fileEntry)) {
+                    String content = IOUtils.toString(is, StandardCharsets.UTF_8);
+                    System.out.println("Subfile: " + fileEntry.getName() + "|" + content);
+                }
+            }
+        }
+    }
+
 
     /**
      * 处理 ZIP 文件读取
