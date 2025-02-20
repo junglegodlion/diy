@@ -39,18 +39,26 @@ public class ZipController {
     }
 
     /**
-     * 处理 ZIP 文件条目
+     * 处理 ZIP 文件条目并输出文件内容
      *
-     * @param zipInputStream ZIP 文件输入流
+     * 遍历 ZIP 输入流中的所有条目，对非目录文件执行内容读取操作。该方法会循环处理直到 ZIP 流中无更多条目，
+     * 自动跳过目录类型的 ZIP 条目，调用者无需手动关闭输入流
+     *
+     * @param zipInputStream ZIP 文件输入流对象，用于迭代读取 ZIP 条目，要求非空且由调用方管理资源关闭
+     * @throws IOException 当读取 ZIP 流发生 I/O 错误时抛出，包括流损坏、权限问题等情况
      */
     private void processZipEntries(ZipInputStream zipInputStream) throws IOException {
         ZipEntry entry;
+        // 循环遍历 ZIP 文件中的所有条目直到流结束
         while ((entry = zipInputStream.getNextEntry()) != null) {
+            // 跳过目录类型的虚拟条目
             if (!entry.isDirectory()) {
-                // 处理单个文件（示例：读取文本内容）
+                // 处理单个文件：读取条目内容并输出（示例实现）
+                // 实际应用可替换为文件提取、内容分析等自定义处理逻辑
                 String content = readEntryContent(zipInputStream);
                 System.out.println("File:  " + entry.getName() + " | Content: " + content);
             }
+            // 必须显式关闭当前 ZIP 条目才能读取下一个条目
             zipInputStream.closeEntry();
         }
     }

@@ -123,7 +123,7 @@ public class FileReaderService {
 
     // 同时处理转义双引号和常规双引号
     public static String cleanSpecialQuotes(String input) {
-        return StringUtils.strip(input,  "\"");
+        return StringUtils.strip(input, "\"");
     }
 
 
