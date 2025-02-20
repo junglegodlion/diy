@@ -1,7 +1,9 @@
 package com.jungo.diy.service;
 
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
+import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
+import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.P99Model;
 import com.jungo.diy.model.UrlPerformanceModel;
@@ -20,7 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.jungo.diy.controller.FileReadController.createP99ModelSheet;
+import static com.jungo.diy.controller.FileReadController.*;
 
 /**
  * @author lichuang3
@@ -34,6 +36,8 @@ public class AnalysisService {
 
     @Autowired
     private ExportService exportService;
+    @Autowired
+    private GateWayDailyPerformanceMapper gateWayDailyPerformanceMapper;
 
     public String get99LineCurve(String url, LocalDate startDate, LocalDate endDate, HttpServletResponse response) {
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
@@ -67,6 +71,26 @@ public class AnalysisService {
             String dateString = localDate.format(formatter);
             p99Model.setDate(dateString);
             p99Model.setP99(apiDailyPerformanceEntity.getP99());
+            p99Models.add(p99Model);
+        }
+        return p99Models;
+    }
+
+    private List<P99Model> getNewP99Models(List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities) {
+        List<P99Model> p99Models = new ArrayList<>();
+        for (GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity : gateWayDailyPerformanceEntities) {
+            P99Model p99Model = new P99Model();
+            Date date = gateWayDailyPerformanceEntity.getDate();
+            // 将 Date 对象转换为 LocalDate 对象
+            Instant instant = date.toInstant();
+            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
+            // 定义日期格式
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            // 将 LocalDate 对象转换为字符串
+            String dateString = localDate.format(formatter);
+            p99Model.setDate(dateString);
+            p99Model.setPeriod(getWeekNumber(localDate));
+            p99Model.setP99(gateWayDailyPerformanceEntity.getP99());
             p99Models.add(p99Model);
         }
         return p99Models;
@@ -278,5 +302,24 @@ public class AnalysisService {
         urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
         urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
         return urlPerformanceResponse;
+    }
+
+    public void getGateWayPerformanceCurve(Integer year, Integer month, HttpServletResponse response) {
+
+        // 获取最近一年的接口性能数据
+        // 获取year年的第一天
+        LocalDate date = LocalDate.of(year, 1, 1);
+        String host = "cl-gateway.tuhu.cn";
+        List<GateWayDailyPerformanceEntity> performanceByYear = gateWayDailyPerformanceMapper.getPerformanceByYear(host, date);
+        // performanceByYear按照date排序
+        performanceByYear.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));
+
+        // 获取该年的99线
+        List<P99Model> p99Models = getNewP99Models(performanceByYear);
+
+        // 获取该年平均99线
+        List<P99Model> averageP99Models = getAverageP99Models(p99Models);
+        System.out.println(averageP99Models);
+
     }
 }

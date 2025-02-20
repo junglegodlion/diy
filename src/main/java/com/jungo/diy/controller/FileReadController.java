@@ -497,7 +497,7 @@ public class FileReadController {
         return slowRequestRateModels;
     }
 
-    private static List<P99Model> getAverageP99Models(List<P99Model> p99Models) {
+    public static List<P99Model> getAverageP99Models(List<P99Model> p99Models) {
         // 将p99Models按照周数分组，组内的顺序按照日期排序，并计算平均值
         Map<Integer, List<P99Model>> groupedP99Models = p99Models.stream().collect(Collectors.groupingBy(P99Model::getPeriod));
         List<P99Model> averageP99Models = new ArrayList<>();
@@ -510,7 +510,8 @@ public class FileReadController {
             // 设置2025年第2周（ISO标准周计算）
             LocalDate date = LocalDate.of(2025,  1, 1)
                     .with(WeekFields.ISO.weekOfYear(),  entry.getKey())
-                    .with(WeekFields.ISO.dayOfWeek(),  3); // 周三
+                    // 周三
+                    .with(WeekFields.ISO.dayOfWeek(),  3);
 
             averageP99Model.setDate(date.format(DateTimeFormatter.ISO_DATE));
             averageP99Model.setPeriod(entry.getKey());
@@ -528,8 +529,7 @@ public class FileReadController {
         }
         List<List<String>> dataLists = data.getSheetModels().get(0).getData();
         List<P99Model> p99Models = new ArrayList<>();
-        // 使用ISO周规则计算周数
-        WeekFields weekFields = WeekFields.ISO;
+
         // 写入数据
         for (int i = 0; i < dataLists.size() - 1; i++) {
             List<String> list = dataLists.get(i + 1);
@@ -539,7 +539,7 @@ public class FileReadController {
             if (specifyDate != null && localDate.isBefore(specifyDate)) {
                 continue;
             }
-            int weekNumber = localDate.get(weekFields.weekOfWeekBasedYear());
+            int weekNumber = getWeekNumber(localDate);
             P99Model p99Model = new P99Model();
             p99Model.setDate(getDateString(dateDouble));
             p99Model.setPeriod(weekNumber);
@@ -547,6 +547,12 @@ public class FileReadController {
             p99Models.add(p99Model);
         }
         return p99Models;
+    }
+
+    public static int getWeekNumber(LocalDate localDate) {
+        // 使用ISO周规则计算周数
+        WeekFields weekFields = WeekFields.ISO;
+        return localDate.get(weekFields.weekOfWeekBasedYear());
     }
 
     private static String getDateString(double excelSerialNumber) {

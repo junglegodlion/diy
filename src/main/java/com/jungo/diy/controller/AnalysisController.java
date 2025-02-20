@@ -29,6 +29,14 @@ public class AnalysisController {
     @Autowired
     AnalysisService analysisService;
 
+    // 获取网关最近一周性能变化曲线图
+    @GetMapping("/getGateWayPerformanceCurve")
+    public void getGateWayPerformanceCurve(@RequestParam("year") Integer year,
+                                           @RequestParam("month") Integer month,
+                                           HttpServletResponse response) {
+        analysisService.getGateWayPerformanceCurve(year, month, response);
+    }
+
     // 获取某一接口几号到几号的99线变化曲线
     @GetMapping("/get99LineCurve")
     public String get99LineCurve(@RequestParam("url") @NotBlank(message = "URL不能为空") String url,
@@ -49,8 +57,8 @@ public class AnalysisController {
     // 获取某号和某号的核心接口性能对比数据
     @GetMapping("/getCorePerformanceCompare")
     public void getCorePerformanceCompare(@RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-                                            @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-                                            HttpServletResponse response) throws UnsupportedEncodingException {
+                                          @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+                                          HttpServletResponse response) throws UnsupportedEncodingException {
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
         }

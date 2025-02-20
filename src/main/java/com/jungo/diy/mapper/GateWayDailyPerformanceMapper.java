@@ -2,7 +2,9 @@ package com.jungo.diy.mapper;
 
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -13,4 +15,6 @@ import java.util.List;
 public interface GateWayDailyPerformanceMapper {
 
     int batchInsert(List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities);
+
+    List<GateWayDailyPerformanceEntity> getPerformanceByYear(@Param("host") String host, @Param("startDate") LocalDate startDate);
 }

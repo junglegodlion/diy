@@ -22,4 +22,10 @@
             (#{item.host}, #{item.p99}, #{item.p999}, #{item.p90}, #{item.p75}, #{item.p50}, #{item.totalRequestCount}, #{item.slowRequestCount}, #{item.date})
         </foreach>
     </insert>
+
+    <select id="getPerformanceByYear" resultMap="BaseResultMap">
+        SELECT *
+        FROM gate_way_daily_performance
+        WHERE host = #{host} and date >= #{startDate};
+    </select>
 </mapper>
