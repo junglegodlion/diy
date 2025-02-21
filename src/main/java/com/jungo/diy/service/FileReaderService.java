@@ -7,6 +7,7 @@ import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.PerformanceFileModel;
 import com.jungo.diy.model.PerformanceFolderModel;
+import com.jungo.diy.util.CsvUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,7 +81,6 @@ public class FileReaderService {
         List<PerformanceFileModel> files = new ArrayList<>();
         performanceFolderModel.setFiles(files);
 
-        // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
         try (Stream<Path> paths = Files.list(dirPath)) {
             paths.filter(Files::isRegularFile)
                     .limit(4)
@@ -92,21 +92,9 @@ public class FileReaderService {
                             PerformanceFileModel performanceFileModel = new PerformanceFileModel();
                             performanceFileModel.setFileName(fileName);
                             String str = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-
-                            String[] lines = str.split("\\R");
-                            List<List<String>> data = new ArrayList<>();
+                            List<List<String>> data = CsvUtils.getData(str);
                             performanceFileModel.setData(data);
-                            for (String line : lines) {
-                                // 去除首尾空格后按逗号分割（支持逗号前后有空格）
-                                String[] parts = line.trim().split("\\s*,\\s*");
-                                List<String> collect = Arrays.stream(parts).map(String::trim).map(FileReaderService::cleanSpecialQuotes).collect(Collectors.toList());
-                                boolean checkListForSlash = checkListForSlash(collect);
-                                if (checkListForSlash) {
-                                    data.add(collect);
-                                }
-                            }
                             files.add(performanceFileModel);
-
                         } catch (IOException e) {
                             log.error("FileReaderService#readTargetFiles,出现异常！", e);
                         }
@@ -121,37 +109,8 @@ public class FileReaderService {
         return "success";
     }
 
-    // 同时处理转义双引号和常规双引号
-    public static String cleanSpecialQuotes(String input) {
-        return StringUtils.strip(input, "\"");
-    }
-
-
-    /**
-     * 检查字符串列表中是否最多只有一个字符串包含 "/"或"="
-     * 此方法用于确保列表中包含"/"或"="的字符串数量不超过一个
-     *
-     * @param list 待检查的字符串列表
-     * @return 如果列表中包含"/"的字符串不超过一个，则返回true；否则返回false
-     */
-    public static boolean checkListForSlash(List<String> list) {
-        int count = 0;
-
-        // 遍历list，统计包含 "/" 的字符串个数
-        for (String str : list) {
-            if (str.contains("/") || str.contains("=")) {
-                count++;
-            }
-            if (count > 1) {
-                return false; // 如果有2个及以上的字符串包含 "/"，返回false
-            }
-        }
-
-        // 如果列表中包含"/"的字符串不超过一个，返回true
-        return true;
-    }
-
     private void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
+        // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
         String folderName = performanceFolderModel.getFolderName();
         // folderName转化成Date
         // 创建SimpleDateFormat实例，并指定日期格式
