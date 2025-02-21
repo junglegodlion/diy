@@ -1,5 +1,6 @@
 package com.jungo.diy.controller;
 
+import com.jungo.diy.model.FileModel;
 import com.jungo.diy.model.FolderModel;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -15,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -28,22 +30,23 @@ public class ZipController {
 
 
     @PostMapping("/read-level-zip")
-    public void readLevelZip(@RequestParam("file") MultipartFile file) throws IOException {
+    public void readLevelZip(@RequestParam("file") MultipartFile file, @RequestParam("write2DB") Integer write2DB) throws IOException {
         // 创建临时文件并自动清理
         File tempFile = File.createTempFile("upload", ".zip");
+        Map<String, FolderModel> folderModelMap = new java.util.HashMap<>();
         try {
             // 将上传文件写入临时文件
             file.transferTo(tempFile);
-
             try (ZipFile zipFile = new ZipFile(tempFile, Charset.forName("GBK"))) {
                 Enumeration<? extends ZipEntry> entries = zipFile.entries();
                 while (entries.hasMoreElements()) {
                     ZipEntry entry = entries.nextElement();
                     if (entry.isDirectory()) {
-                        processDirectoryFiles(zipFile, entry.getName());
+                        processDirectoryFiles(zipFile, entry.getName(), write2DB, folderModelMap);
                     }
                 }
             }
+            System.out.println(folderModelMap);
         } finally {
             // 确保删除临时文件
             if (!tempFile.delete()) {
@@ -52,9 +55,9 @@ public class ZipController {
         }
     }
 
-    private void processDirectoryFiles(ZipFile zipFile, String dirPrefix) throws IOException {
+    private void processDirectoryFiles(ZipFile zipFile, String dirPrefix, Integer write2DB, Map<String, FolderModel> folderModelMap) throws IOException {
         Enumeration<? extends ZipEntry> allEntries = zipFile.entries();
-        Map<String, FolderModel> FolderModelMap = new java.util.HashMap<>();
+
 
         while (allEntries.hasMoreElements()) {
             ZipEntry fileEntry = allEntries.nextElement();
@@ -66,10 +69,28 @@ public class ZipController {
                 String name = fileEntry.getName();
                 // 将name按照"/"分割
                 String[] segments = name.split("/");
+                String folderName = segments[0];
+                String fileName = segments[1];
+                FolderModel folderModel = folderModelMap.get(folderName);
+                if (folderModel == null) {
+                    folderModel = new FolderModel();
+                    folderModel.setFolderName(folderName);
+                    folderModel.setFiles(new java.util.ArrayList<>());
+                    folderModelMap.put(folderName, folderModel);
+                }
 
                 try (InputStream is = zipFile.getInputStream(fileEntry)) {
                     String content = IOUtils.toString(is, StandardCharsets.UTF_8);
-                    System.out.println("Subfile: " + fileEntry.getName() + "|" + content);
+                    if (write2DB != null && write2DB == 1) {
+                        List<FileModel> files = folderModel.getFiles();
+                        FileModel fileModel = new FileModel();
+                        fileModel.setFileName(fileName);
+                        fileModel.setData(content);
+                        files.add(fileModel);
+                    } else {
+                        System.out.println("Subfile: " + fileEntry.getName());
+                    }
+
                 }
             }
         }
