@@ -139,7 +139,7 @@ public class FileReaderService {
         List<List<String>> slowRequestSheetModel = map.get("慢查询");
         Map<String, Integer> slowRequestSheetModelMap = slowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));
         // 请求情况文件
-        List<List<String>> requestSheetModel = map.get("请求情况");
+        List<List<String>> deduplicateRequestSheetModel = deduplicate(map.get("请求情况"));
 
         // 域名慢查询文件
         List<List<String>> domainSlowRequestSheetModel = map.get("域名慢查询");
@@ -149,9 +149,29 @@ public class FileReaderService {
         List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntitiesOld(domainRequestSheetModel, date, domainSlowRequest);
         gateWayDailyPerformanceMapper.batchInsert(gateWayDailyPerformanceEntities);
 
-        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntitiesOld(requestSheetModel, date, slowRequestSheetModelMap);
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntitiesOld(deduplicateRequestSheetModel, date, slowRequestSheetModelMap);
         apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
     }
+
+    /**
+     * 对请求表数据进行去重处理，保留每个token中总请求数最大的记录
+     *
+     * @param requestSheetModel 原始请求表数据，每个元素为一个记录行，包含token和请求数等信息
+     * @return 去重后的请求表数据列表，每个token仅保留请求数最大的记录
+     */
+    private List<List<String>> deduplicate(List<List<String>> requestSheetModel) {
+        Map<String, List<String>> tokenMap = new HashMap<>();
+        for (List<String> record : requestSheetModel) {
+            String token = record.get(0);
+            tokenMap.merge(token, record, (existingRecord, newRecord) -> {
+                int existingCount = Integer.parseInt(existingRecord.get(1));
+                int newCount = Integer.parseInt(newRecord.get(1));
+                return newCount > existingCount ? newRecord : existingRecord;
+            });
+        }
+        return new ArrayList<>(tokenMap.values());
+    }
+
 
     private List<ApiDailyPerformanceEntity> getApiDailyPerformanceEntitiesOld(List<List<String>> requestSheetModel,
                                                                               Date date,
