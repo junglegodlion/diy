@@ -18,6 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -112,6 +114,88 @@ public class FileReaderService {
     private void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
         // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
         String folderName = performanceFolderModel.getFolderName();
+        // folderName转化成LocalDate
+        // 创建日期格式化对象
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        // 解析日期字符串为 LocalDate 对象
+        LocalDate localDate = LocalDate.parse(folderName, formatter);
+
+        // localDate < 2025-01-17
+        if (localDate.isBefore(LocalDate.of(2025, 1, 17))) {
+            write2DBOld(performanceFolderModel, folderName);
+        } else {
+            write2DBNew(performanceFolderModel, folderName);
+        }
+
+    }
+
+    private void write2DBOld(PerformanceFolderModel performanceFolderModel, String folderName) {
+        // folderName转化成Date
+        // 创建SimpleDateFormat实例，并指定日期格式
+        Date date = getDateFromString(folderName);
+        Map<String, List<List<String>>> map = performanceFolderModel.getFiles().stream().collect(Collectors.toMap(PerformanceFileModel::getFileName, PerformanceFileModel::getData));
+        // 慢查询文件
+        List<List<String>> slowRequestSheetModel = map.get("慢查询");
+        Map<String, Integer> slowRequestSheetModelMap = slowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));
+        // 请求情况文件
+        List<List<String>> requestSheetModel = map.get("请求情况");
+
+        // 域名慢查询文件
+        List<List<String>> domainSlowRequestSheetModel = map.get("域名慢查询");
+        String domainSlowRequest = domainSlowRequestSheetModel.get(0).get(0);
+        // 域名请求情况文件
+        List<List<String>> domainRequestSheetModel = map.get("域名请求情况");
+        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntitiesOld(domainRequestSheetModel, date, domainSlowRequest);
+        gateWayDailyPerformanceMapper.batchInsert(gateWayDailyPerformanceEntities);
+
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntitiesOld(requestSheetModel, date, slowRequestSheetModelMap);
+        apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
+    }
+
+    private List<ApiDailyPerformanceEntity> getApiDailyPerformanceEntitiesOld(List<List<String>> requestSheetModel,
+                                                                              Date date,
+                                                                              Map<String, Integer> slowRequestSheetModelMap) {
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = new ArrayList<>();
+        for (List<String> list : requestSheetModel) {
+            String url = list.get(0);
+            if (checkUrl(url)) {
+                ApiDailyPerformanceEntity apiDailyPerformanceEntity = new ApiDailyPerformanceEntity();
+                apiDailyPerformanceEntity.setDate(date);
+                apiDailyPerformanceEntity.setHost("cl-gateway.tuhu.cn");
+                apiDailyPerformanceEntity.setUrl(url);
+                apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(1)));
+                apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(2)));
+                apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(3)));
+                apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(4)));
+                apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(5)));
+                apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(6)));
+                apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0), 0));
+                apiDailyPerformanceEntities.add(apiDailyPerformanceEntity);
+            }
+        }
+        return apiDailyPerformanceEntities;
+    }
+
+    private List<GateWayDailyPerformanceEntity> getGateWayDailyPerformanceEntitiesOld(List<List<String>> domainRequestSheetModel, Date date, String domainSlowRequest) {
+        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = new ArrayList<>();
+        for (List<String> list : domainRequestSheetModel) {
+            GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = new GateWayDailyPerformanceEntity();
+            gateWayDailyPerformanceEntity.setDate(date);
+            gateWayDailyPerformanceEntity.setHost("cl-gateway.tuhu.cn");
+            gateWayDailyPerformanceEntity.setP999(Integer.parseInt(list.get(1)));
+            gateWayDailyPerformanceEntity.setP99(Integer.parseInt(list.get(2)));
+            gateWayDailyPerformanceEntity.setP90(Integer.parseInt(list.get(3)));
+            gateWayDailyPerformanceEntity.setP75(Integer.parseInt(list.get(4)));
+            gateWayDailyPerformanceEntity.setP50(Integer.parseInt(list.get(5)));
+            gateWayDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(0)));
+            gateWayDailyPerformanceEntity.setSlowRequestCount(Integer.parseInt(domainSlowRequest));
+            gateWayDailyPerformanceEntities.add(gateWayDailyPerformanceEntity);
+        }
+        return gateWayDailyPerformanceEntities;
+    }
+
+    private void write2DBNew(PerformanceFolderModel performanceFolderModel, String folderName) {
         // folderName转化成Date
         // 创建SimpleDateFormat实例，并指定日期格式
         Date date = getDateFromString(folderName);
@@ -177,6 +261,7 @@ public class FileReaderService {
         return apiDailyPerformanceEntities;
     }
 
+    // 匹配以字母开头，包含字母、数字和下划线，并以字母或数字结尾的正则表达式
     private boolean checkUrl(String path) {
         if (StringUtils.isBlank(path)) {
             return false;
@@ -201,7 +286,6 @@ public class FileReaderService {
         try {
             // 使用parse()方法将String转换为Date
             return dateFormat.parse(folderName);
-
         } catch (ParseException e) {
             log.error("FileReaderService#writeDataToDatabase,出现异常！", e);
         }
