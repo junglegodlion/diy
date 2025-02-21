@@ -8,6 +8,7 @@ import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.PerformanceFileModel;
 import com.jungo.diy.model.PerformanceFolderModel;
 import com.jungo.diy.util.CsvUtils;
+import com.jungo.diy.util.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -94,7 +93,7 @@ public class FileReaderService {
                             PerformanceFileModel performanceFileModel = new PerformanceFileModel();
                             performanceFileModel.setFileName(fileName);
                             String str = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-                            List<List<String>> data = CsvUtils.getData(str);
+                            List<List<String>> data = CsvUtils.getData(str, directoryName);
                             performanceFileModel.setData(data);
                             files.add(performanceFileModel);
                         } catch (IOException e) {
@@ -115,43 +114,10 @@ public class FileReaderService {
         // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
         String folderName = performanceFolderModel.getFolderName();
         // folderName转化成LocalDate
-        // 创建日期格式化对象
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-        // 解析日期字符串为 LocalDate 对象
-        LocalDate localDate = LocalDate.parse(folderName, formatter);
-
-        // localDate < 2025-01-17
-        if (localDate.isBefore(LocalDate.of(2025, 1, 17))) {
-            write2DBOld(performanceFolderModel, folderName);
-        } else {
-            write2DBNew(performanceFolderModel, folderName);
-        }
+        write2DBNew(performanceFolderModel, folderName);
 
     }
 
-    private void write2DBOld(PerformanceFolderModel performanceFolderModel, String folderName) {
-        // folderName转化成Date
-        // 创建SimpleDateFormat实例，并指定日期格式
-        Date date = getDateFromString(folderName);
-        Map<String, List<List<String>>> map = performanceFolderModel.getFiles().stream().collect(Collectors.toMap(PerformanceFileModel::getFileName, PerformanceFileModel::getData));
-        // 慢查询文件
-        List<List<String>> slowRequestSheetModel = map.get("慢查询");
-        Map<String, Integer> slowRequestSheetModelMap = slowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));
-        // 请求情况文件
-        List<List<String>> deduplicateRequestSheetModel = deduplicate(map.get("请求情况"));
-
-        // 域名慢查询文件
-        List<List<String>> domainSlowRequestSheetModel = map.get("域名慢查询");
-        String domainSlowRequest = domainSlowRequestSheetModel.get(0).get(0);
-        // 域名请求情况文件
-        List<List<String>> domainRequestSheetModel = map.get("域名请求情况");
-        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntitiesOld(domainRequestSheetModel, date, domainSlowRequest);
-        gateWayDailyPerformanceMapper.batchInsert(gateWayDailyPerformanceEntities);
-
-        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntitiesOld(deduplicateRequestSheetModel, date, slowRequestSheetModelMap);
-        apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
-    }
 
     /**
      * 对请求表数据进行去重处理，保留每个token中总请求数最大的记录
@@ -162,57 +128,14 @@ public class FileReaderService {
     private List<List<String>> deduplicate(List<List<String>> requestSheetModel) {
         Map<String, List<String>> tokenMap = new HashMap<>();
         for (List<String> record : requestSheetModel) {
-            String token = record.get(0);
+            String token = (record.get(0) + record.get(1)).toLowerCase();
             tokenMap.merge(token, record, (existingRecord, newRecord) -> {
-                int existingCount = Integer.parseInt(existingRecord.get(1));
-                int newCount = Integer.parseInt(newRecord.get(1));
+                int existingCount = Integer.parseInt(existingRecord.get(2));
+                int newCount = Integer.parseInt(newRecord.get(2));
                 return newCount > existingCount ? newRecord : existingRecord;
             });
         }
         return new ArrayList<>(tokenMap.values());
-    }
-
-
-    private List<ApiDailyPerformanceEntity> getApiDailyPerformanceEntitiesOld(List<List<String>> requestSheetModel,
-                                                                              Date date,
-                                                                              Map<String, Integer> slowRequestSheetModelMap) {
-        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = new ArrayList<>();
-        for (List<String> list : requestSheetModel) {
-            String url = list.get(0);
-            if (checkUrl(url)) {
-                ApiDailyPerformanceEntity apiDailyPerformanceEntity = new ApiDailyPerformanceEntity();
-                apiDailyPerformanceEntity.setDate(date);
-                apiDailyPerformanceEntity.setHost("cl-gateway.tuhu.cn");
-                apiDailyPerformanceEntity.setUrl(url);
-                apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(1)));
-                apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(2)));
-                apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(3)));
-                apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(4)));
-                apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(5)));
-                apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(6)));
-                apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0), 0));
-                apiDailyPerformanceEntities.add(apiDailyPerformanceEntity);
-            }
-        }
-        return apiDailyPerformanceEntities;
-    }
-
-    private List<GateWayDailyPerformanceEntity> getGateWayDailyPerformanceEntitiesOld(List<List<String>> domainRequestSheetModel, Date date, String domainSlowRequest) {
-        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = new ArrayList<>();
-        for (List<String> list : domainRequestSheetModel) {
-            GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = new GateWayDailyPerformanceEntity();
-            gateWayDailyPerformanceEntity.setDate(date);
-            gateWayDailyPerformanceEntity.setHost("cl-gateway.tuhu.cn");
-            gateWayDailyPerformanceEntity.setP999(Integer.parseInt(list.get(1)));
-            gateWayDailyPerformanceEntity.setP99(Integer.parseInt(list.get(2)));
-            gateWayDailyPerformanceEntity.setP90(Integer.parseInt(list.get(3)));
-            gateWayDailyPerformanceEntity.setP75(Integer.parseInt(list.get(4)));
-            gateWayDailyPerformanceEntity.setP50(Integer.parseInt(list.get(5)));
-            gateWayDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(0)));
-            gateWayDailyPerformanceEntity.setSlowRequestCount(Integer.parseInt(domainSlowRequest));
-            gateWayDailyPerformanceEntities.add(gateWayDailyPerformanceEntity);
-        }
-        return gateWayDailyPerformanceEntities;
     }
 
     private void write2DBNew(PerformanceFolderModel performanceFolderModel, String folderName) {
@@ -224,8 +147,7 @@ public class FileReaderService {
         List<List<String>> slowRequestSheetModel = map.get("慢查询");
         Map<String, Integer> slowRequestSheetModelMap = slowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0) + x.get(1), x -> Integer.parseInt(x.get(2)), (x, y) -> x));
         // 请求情况文件
-        List<List<String>> requestSheetModel = map.get("请求情况");
-
+        List<List<String>> requestSheetModel = deduplicate(map.get("请求情况"));
         // 域名慢查询文件
         List<List<String>> domainSlowRequestSheetModel = map.get("域名慢查询");
         Map<String, Integer> domainSlowRequestSheetModelMap = domainSlowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));

@@ -1,8 +1,6 @@
 package com.jungo.diy.util;
 
 
-import com.jungo.diy.model.InterfacePerformanceModel;
-import com.jungo.diy.service.FileReaderService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -11,7 +9,10 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -19,7 +20,10 @@ import java.util.stream.Collectors;
  */
 public class CsvUtils {
 
-    public static List<List<String>> getData(String str) {
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final LocalDate DATE_THRESHOLD = LocalDate.of(2025, 1, 17);
+    private static final String HOST_NAME = "cl-gateway.tuhu.cn";
+    public static List<List<String>> getData(String str, String directoryName) {
         if (StringUtils.isBlank(str)) {
             return Collections.emptyList();
         }
@@ -35,10 +39,32 @@ public class CsvUtils {
             String[] parts = line.trim().split("\\s*,\\s*");
             List<String> collect = Arrays.stream(parts).map(s -> cleanSpecialQuotes(s.trim())).collect(Collectors.toList());
             if (checkListForSlash(collect)) {
-                data.add(collect);
+                // 对collect进行处理
+                List<String> newCollect = getNewCollect(collect, directoryName);
+                data.add(newCollect);
             }
         }
         return data;
+    }
+
+    /**
+     * 根据目录名日期判断是否需要修改原始集合，若目录日期早于阈值则在头部添加主机名
+     *
+     * @param collect        原始字符串集合，可能被修改的基础集合
+     * @param directoryName  目录名称（需符合DATE_FORMATTER格式的日期字符串）
+     * @return 若满足日期条件则返回添加了HOST_NAME的新集合，否则返回原始集合
+     *         返回的集合顺序：当添加时HOST_NAME位于集合第一个元素位置
+     */
+    private static List<String> getNewCollect(List<String> collect, String directoryName) {
+        LocalDate localDate = LocalDate.parse(directoryName, DATE_FORMATTER);
+
+        if (localDate.isBefore(DATE_THRESHOLD)) {
+            List<String> newCollect = new ArrayList<>(collect.size() + 1);
+            newCollect.add(HOST_NAME);
+            newCollect.addAll(collect);
+            return newCollect;
+        }
+        return collect;
     }
 
     /**
@@ -51,8 +77,13 @@ public class CsvUtils {
     public static boolean checkListForSlash(List<String> list) {
         int count = 0;
 
+
+
         // 遍历list，统计包含 "/" 的字符串个数
         for (String str : list) {
+            if (containsOtherSpecialChars(str)) {
+                return false;
+            }
             if (str.contains("/") || str.contains("=")) {
                 count++;
             }
@@ -64,6 +95,14 @@ public class CsvUtils {
 
         // 如果列表中包含"/"的字符串不超过一个，返回true
         return true;
+    }
+
+    // 判断字符串是否包含除"-"、"="和"/"的特殊字符
+    public static boolean containsOtherSpecialChars(String input) {
+        // 定义正则表达式，匹配除字母、数字、'-'、'=' 和 '/' 之外的字符
+        // 定义正则表达式，使用字符类的否定形式匹配目标字符
+        String regex = "[^a-zA-Z0-9\\-=./]";
+        return Pattern.compile(regex).matcher(input).find();
     }
 
     public static String cleanSpecialQuotes(String input) {
