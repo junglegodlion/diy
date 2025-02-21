@@ -1,5 +1,6 @@
 package com.jungo.diy.controller;
 
+import com.jungo.diy.model.FolderModel;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Enumeration;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
@@ -52,13 +54,18 @@ public class ZipController {
 
     private void processDirectoryFiles(ZipFile zipFile, String dirPrefix) throws IOException {
         Enumeration<? extends ZipEntry> allEntries = zipFile.entries();
+        Map<String, FolderModel> FolderModelMap = new java.util.HashMap<>();
 
         while (allEntries.hasMoreElements()) {
             ZipEntry fileEntry = allEntries.nextElement();
 
             if (!fileEntry.isDirectory() &&
                     fileEntry.getName().startsWith(dirPrefix) &&
-                    !fileEntry.getName().equals(dirPrefix)) {  // 排除目录自身
+                    // 排除目录自身
+                    !fileEntry.getName().equals(dirPrefix)) {
+                String name = fileEntry.getName();
+                // 将name按照"/"分割
+                String[] segments = name.split("/");
 
                 try (InputStream is = zipFile.getInputStream(fileEntry)) {
                     String content = IOUtils.toString(is, StandardCharsets.UTF_8);
