@@ -3,12 +3,10 @@ package com.jungo.diy.service;
 
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
-import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
-import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.PerformanceFileModel;
 import com.jungo.diy.model.PerformanceFolderModel;
+import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.util.CsvUtils;
-import com.jungo.diy.util.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,11 +36,9 @@ public class FileReaderService {
     // 仅允许英文字母和 -：通过字符集 [A-Za-z-] 控制（需注意 - 在正则中需放在末尾避免歧义）
     private static final Pattern PATTERN = Pattern.compile("^(?=.*-)[A-Za-z-]+$");
 
-    @Autowired
-    ApiDailyPerformanceMapper apiDailyPerformanceMapper;
 
     @Autowired
-    GateWayDailyPerformanceMapper gateWayDailyPerformanceMapper;
+    PerformanceRepository performanceRepository;
 
     /**
      * 读取指定目录下的文件，并将文件内容写入数据库
@@ -111,10 +107,14 @@ public class FileReaderService {
     }
 
     private void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
-        // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
-        String folderName = performanceFolderModel.getFolderName();
-        // folderName转化成LocalDate
-        write2DBNew(performanceFolderModel, folderName);
+        try {
+            // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
+            String folderName = performanceFolderModel.getFolderName();
+            // folderName转化成LocalDate
+            write2DBNew(performanceFolderModel, folderName);
+        } catch (Exception e) {
+            log.error("FileReaderService#writeDataToDatabase,出现异常！", e);
+        }
 
     }
 
@@ -154,10 +154,9 @@ public class FileReaderService {
         // 域名请求情况文件
         List<List<String>> domainRequestSheetModel = map.get("域名请求情况");
         List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntities(domainRequestSheetModel, date, domainSlowRequestSheetModelMap);
-        gateWayDailyPerformanceMapper.batchInsert(gateWayDailyPerformanceEntities);
-
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntities(requestSheetModel, date, slowRequestSheetModelMap);
-        apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
+
+        performanceRepository.writePerformanceData2DB(gateWayDailyPerformanceEntities, apiDailyPerformanceEntities);
     }
 
     private List<GateWayDailyPerformanceEntity> getGateWayDailyPerformanceEntities(List<List<String>> domainRequestSheetModel,
