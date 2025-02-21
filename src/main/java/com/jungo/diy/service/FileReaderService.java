@@ -106,7 +106,7 @@ public class FileReaderService {
         return "success";
     }
 
-    private void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
+    public void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
         try {
             // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
             String folderName = performanceFolderModel.getFolderName();

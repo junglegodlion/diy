@@ -2,8 +2,10 @@ package com.jungo.diy.controller;
 
 import com.jungo.diy.model.FileModel;
 import com.jungo.diy.model.FolderModel;
+import com.jungo.diy.service.ZipService;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,6 +31,8 @@ import java.util.zip.ZipInputStream;
 public class ZipController {
 
 
+    @Autowired
+    ZipService zipService;
     @PostMapping("/read-level-zip")
     public void readLevelZip(@RequestParam("file") MultipartFile file, @RequestParam("write2DB") Integer write2DB) throws IOException {
         // 创建临时文件并自动清理
@@ -46,13 +50,14 @@ public class ZipController {
                     }
                 }
             }
-            System.out.println(folderModelMap);
         } finally {
             // 确保删除临时文件
             if (!tempFile.delete()) {
                 tempFile.deleteOnExit();
             }
         }
+
+        zipService.write2DB(folderModelMap);
     }
 
     private void processDirectoryFiles(ZipFile zipFile, String dirPrefix, Integer write2DB, Map<String, FolderModel> folderModelMap) throws IOException {
@@ -71,6 +76,8 @@ public class ZipController {
                 String[] segments = name.split("/");
                 String folderName = segments[0];
                 String fileName = segments[1];
+                // fileName去除.csv后缀
+                fileName = fileName.substring(0, fileName.length() - 4);
                 FolderModel folderModel = folderModelMap.get(folderName);
                 if (folderModel == null) {
                     folderModel = new FolderModel();
