@@ -29,13 +29,15 @@ public class AnalysisController {
     @Autowired
     AnalysisService analysisService;
 
-    // 获取网关最近一周性能变化曲线图
-    @GetMapping("/getGateWayPerformanceCurve")
-    public void getGateWayPerformanceCurve(@RequestParam("year") Integer year,
-                                           @RequestParam("month") Integer month,
-                                           HttpServletResponse response) {
-        analysisService.getGateWayPerformanceCurve(year, month, response);
+
+    // 获取网关性能变化
+    @GetMapping("/getGateWayPerformanceCurveChart")
+    public void getGateWayPerformanceCurveChart(@RequestParam("year") Integer year,
+                                                @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+                                                HttpServletResponse response) {
+        analysisService.getGateWayPerformanceCurveChart(year, startDate, response);
     }
+
 
     // 获取某一接口几号到几号的99线变化曲线
     @GetMapping("/get99LineCurve")

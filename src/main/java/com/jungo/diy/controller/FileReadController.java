@@ -4,6 +4,7 @@ import com.jungo.diy.model.*;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
+import com.jungo.diy.util.PerformanceUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Cell;
@@ -249,11 +250,11 @@ public class FileReadController {
         // 99线-指定日期 如“2025-02-01”
         List<P99Model> p99Models = getAllP99Models(data, "2025-02-01");
         // 周维度99线
-        List<P99Model> averageP99Models = getAverageP99Models(getAllP99Models(data, null));
+        List<P99Model> averageP99Models = PerformanceUtils.getAverageP99Models(getAllP99Models(data, null));
         // 慢请求率
         List<SlowRequestRateModel> slowRequestRateModels = getSlowRequestRateModels(data, "2025-02-01");
         // 周维度慢请求率
-        List<SlowRequestRateModel> averageSlowRequestRateModels = getAverageSlowRequestRateModels(getSlowRequestRateModels(data, null));
+        List<SlowRequestRateModel> averageSlowRequestRateModels = PerformanceUtils.getAverageSlowRequestRateModels(getSlowRequestRateModels(data, null));
         // 画图
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             // 定义 Sheet 名称和数据列表
@@ -287,7 +288,7 @@ public class FileReadController {
         }
     }
 
-    private void createSlowRequestRateModelSheet(XSSFWorkbook workbook,
+    public static void createSlowRequestRateModelSheet(XSSFWorkbook workbook,
                                                  String sheetName,
                                                  List<SlowRequestRateModel> slowRequestRateModels,
                                                  String titleText,
@@ -313,7 +314,7 @@ public class FileReadController {
 
     }
 
-    private void createSlowRequestRateModelsData(XSSFWorkbook workbook,
+    private static void createSlowRequestRateModelsData(XSSFWorkbook workbook,
                                                  XSSFSheet sheet,
                                                  List<SlowRequestRateModel> slowRequestRateModels) {
         Row headerRow = sheet.createRow(0);
@@ -443,30 +444,7 @@ public class FileReadController {
 
     }
 
-    private List<SlowRequestRateModel> getAverageSlowRequestRateModels(List<SlowRequestRateModel> slowRequestRateModels) {
-        // 将slowRequestRateModels按照周数分组，计算平均值
-        Map<Integer, List<SlowRequestRateModel>> groupedSlowRequestRateModels = slowRequestRateModels.stream().collect(Collectors.groupingBy(SlowRequestRateModel::getPeriod));
-        List<SlowRequestRateModel> averageSlowRequestRateModels = new ArrayList<>();
-        for (Map.Entry<Integer, List<SlowRequestRateModel>> entry : groupedSlowRequestRateModels.entrySet()) {
-            List<SlowRequestRateModel> slowRequestRateModelList = entry.getValue();
 
-            // 计算平均慢请求率
-            double sum = slowRequestRateModelList.stream().mapToDouble(SlowRequestRateModel::getSlowRequestRate).sum();
-            double average = sum / slowRequestRateModelList.size();
-            SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
-
-            // 设置2025年第2周（ISO标准周计算）
-            LocalDate date = LocalDate.of(2025,  1, 1)
-                    .with(WeekFields.ISO.weekOfYear(),  entry.getKey())
-                    .with(WeekFields.ISO.dayOfWeek(),  3); // 周三
-
-            slowRequestRateModel.setDate(date.format(DateTimeFormatter.ISO_DATE));
-            slowRequestRateModel.setPeriod(entry.getKey());
-            slowRequestRateModel.setSlowRequestRate(average);
-            averageSlowRequestRateModels.add(slowRequestRateModel);
-        }
-        return averageSlowRequestRateModels;
-    }
 
     private List<SlowRequestRateModel> getSlowRequestRateModels(ExcelModel data, String dateStr) {
         LocalDate specifyDate = null;
@@ -497,29 +475,7 @@ public class FileReadController {
         return slowRequestRateModels;
     }
 
-    public static List<P99Model> getAverageP99Models(List<P99Model> p99Models) {
-        // 将p99Models按照周数分组，组内的顺序按照日期排序，并计算平均值
-        Map<Integer, List<P99Model>> groupedP99Models = p99Models.stream().collect(Collectors.groupingBy(P99Model::getPeriod));
-        List<P99Model> averageP99Models = new ArrayList<>();
-        for (Map.Entry<Integer, List<P99Model>> entry : groupedP99Models.entrySet()) {
-            List<P99Model> p99ModelList = entry.getValue();
-            int sum = p99ModelList.stream().mapToInt(P99Model::getP99).sum();
-            int average = sum / p99ModelList.size();
-            P99Model averageP99Model = new P99Model();
 
-            // 设置2025年第2周（ISO标准周计算）
-            LocalDate date = LocalDate.of(2025,  1, 1)
-                    .with(WeekFields.ISO.weekOfYear(),  entry.getKey())
-                    // 周三
-                    .with(WeekFields.ISO.dayOfWeek(),  3);
-
-            averageP99Model.setDate(date.format(DateTimeFormatter.ISO_DATE));
-            averageP99Model.setPeriod(entry.getKey());
-            averageP99Model.setP99(average);
-            averageP99Models.add(averageP99Model);
-        }
-        return averageP99Models;
-    }
 
     private static List<P99Model> getAllP99Models(ExcelModel data, String dateStr) {
         LocalDate specifyDate = null;

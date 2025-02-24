@@ -4,6 +4,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.WeekFields;
 import java.util.Date;
 
 /**
@@ -35,4 +38,26 @@ public class GateWayDailyPerformanceEntity {
     private Integer slowRequestCount;
     // 日期
     private Date date;
+
+    int weekNumber;
+
+    // 慢请求率
+    private double slowRequestRate;
+
+    public double getSlowRequestRate() {
+        if (totalRequestCount == null || slowRequestCount == null) {
+            // 或者抛出异常，根据业务逻辑决定
+            return 0.0f;
+        }
+        return (float) slowRequestCount / totalRequestCount;
+    }
+
+    public int getWeekNumber() {
+        LocalDate localDate = date.toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+        // 使用ISO周规则计算周数
+        WeekFields weekFields = WeekFields.ISO;
+        return localDate.get(weekFields.weekOfWeekBasedYear());
+    }
 }

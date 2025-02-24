@@ -6,15 +6,21 @@ import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.P99Model;
+import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.util.PerformanceUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.constraints.PastOrPresent;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -89,7 +95,7 @@ public class AnalysisService {
             // 将 LocalDate 对象转换为字符串
             String dateString = localDate.format(formatter);
             p99Model.setDate(dateString);
-            p99Model.setPeriod(getWeekNumber(localDate));
+            p99Model.setPeriod(gateWayDailyPerformanceEntity.getWeekNumber());
             p99Model.setP99(gateWayDailyPerformanceEntity.getP99());
             p99Models.add(p99Model);
         }
@@ -304,22 +310,117 @@ public class AnalysisService {
         return urlPerformanceResponse;
     }
 
-    public void getGateWayPerformanceCurve(Integer year, Integer month, HttpServletResponse response) {
 
-        // 获取最近一年的接口性能数据
-        // 获取year年的第一天
+    public void getGateWayPerformanceCurveChart(Integer year, @PastOrPresent LocalDate startDate, HttpServletResponse response) {
+        // 设置响应头
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment;filename=performance_chart.xlsx");
+        // 获取该year年的"cl-gateway.tuhu.cn"的性能数据
         LocalDate date = LocalDate.of(year, 1, 1);
         String host = "cl-gateway.tuhu.cn";
         List<GateWayDailyPerformanceEntity> performanceByYear = gateWayDailyPerformanceMapper.getPerformanceByYear(host, date);
+
         // performanceByYear按照date排序
         performanceByYear.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));
 
         // 获取该年的99线
-        List<P99Model> p99Models = getNewP99Models(performanceByYear);
+        List<P99Model> yearP99Models = getNewP99Models(performanceByYear);
+        // 获取该月99线
+        List<P99Model> monthP99Models = getMonthP99Models(performanceByYear, startDate);
 
-        // 获取该年平均99线
-        List<P99Model> averageP99Models = getAverageP99Models(p99Models);
-        System.out.println(averageP99Models);
+        // 获取该年周维度平均99线
+        List<P99Model> averageP99Models = PerformanceUtils.getAverageP99Models(yearP99Models);
 
+        // 获取该月慢请求率
+        List<SlowRequestRateModel> monthSlowRequestRateModels = getMonthSlowRequestRateModels(performanceByYear, startDate);
+
+        // 慢请求率
+        List<SlowRequestRateModel> yearSlowRequestRateModels = getSlowRequestRateModels(performanceByYear);
+
+        // 周维度慢请求率
+        List<SlowRequestRateModel> averageSlowRequestRateModels = PerformanceUtils.getAverageSlowRequestRateModels(yearSlowRequestRateModels);
+
+        // 画图
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            // 定义 Sheet 名称和数据列表
+            String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率"};
+
+            createP99ModelSheet(workbook, sheetNames[0], monthP99Models, "gateway 99线", "日期", "99线", "99线");
+            createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
+            createSlowRequestRateModelSheet(workbook, sheetNames[2], monthSlowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
+            createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
+
+            // 拼接完整的文件路径
+            // 获取当天日期并格式化为 yyyy-MM-dd 格式
+            LocalDate currentDate = LocalDate.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            String formattedDate = currentDate.format(formatter);
+            String fileName = URLEncoder.encode(formattedDate + "_chart.xlsx", StandardCharsets.UTF_8.toString());
+            String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/图表";
+            String filePath = directoryPath + "/" + fileName;
+
+            // 写入文件
+            try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+                workbook.write(fileOut);
+            } catch (IOException e) {
+                log.error("ExportService#exportToExcel,出现异常！", e);
+            }
+
+            // 6. 保存文件
+            workbook.write(response.getOutputStream());
+        } catch (Exception e) {
+            log.error("FileReadController#getCharts,出现异常！", e);
+        }
+
+    }
+
+    private List<SlowRequestRateModel> getMonthSlowRequestRateModels(List<GateWayDailyPerformanceEntity> performanceByYear,
+                                                                     @PastOrPresent LocalDate startDate) {
+        // 过滤出>=startDate的数据
+        List<GateWayDailyPerformanceEntity> collect = performanceByYear.stream()
+                .filter(entity -> {
+                    LocalDate localDate = entity.getDate().toInstant()
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate();
+
+                    return startDate.isEqual(localDate) || startDate.isBefore(localDate);
+                })
+                .collect(Collectors.toList());
+
+        return getSlowRequestRateModels(collect);
+    }
+
+    private List<P99Model> getMonthP99Models(List<GateWayDailyPerformanceEntity> performanceByYear, @PastOrPresent LocalDate startDate) {
+        // 过滤出>=startDate的数据
+        List<GateWayDailyPerformanceEntity> collect = performanceByYear.stream()
+                .filter(entity -> {
+                    LocalDate localDate = entity.getDate().toInstant()
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate();
+
+                    return startDate.isEqual(localDate) || startDate.isBefore(localDate);
+                })
+                .collect(Collectors.toList());
+        return getNewP99Models(collect);
+    }
+
+    private List<SlowRequestRateModel> getSlowRequestRateModels(List<GateWayDailyPerformanceEntity> performanceByYear) {
+        List<SlowRequestRateModel> result = new ArrayList<>();
+        for (GateWayDailyPerformanceEntity performance : performanceByYear) {
+            SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
+            Date date = performance.getDate();
+            // 将 Date 对象转换为 LocalDate 对象
+            Instant instant = date.toInstant();
+            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
+            // 定义日期格式
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            // 将 LocalDate 对象转换为字符串
+            String dateString = localDate.format(formatter);
+            slowRequestRateModel.setDate(dateString);
+            slowRequestRateModel.setPeriod(performance.getWeekNumber());
+            slowRequestRateModel.setSlowRequestRate(performance.getSlowRequestRate());
+            result.add(slowRequestRateModel);
+        }
+        return result;
     }
 }
