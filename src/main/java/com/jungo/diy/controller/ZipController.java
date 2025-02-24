@@ -3,7 +3,7 @@ package com.jungo.diy.controller;
 import com.jungo.diy.model.FileModel;
 import com.jungo.diy.model.FolderModel;
 import com.jungo.diy.service.ZipService;
-import org.apache.commons.io.IOUtils;
+import com.jungo.diy.util.CsvUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -87,12 +87,12 @@ public class ZipController {
                 }
 
                 try (InputStream is = zipFile.getInputStream(fileEntry)) {
-                    String content = IOUtils.toString(is, StandardCharsets.UTF_8);
+                    List<List<String>> listList = CsvUtils.getDataFromInputStream(folderName, is);
                     if (write2DB != null && write2DB == 1) {
                         List<FileModel> files = folderModel.getFiles();
                         FileModel fileModel = new FileModel();
                         fileModel.setFileName(fileName);
-                        fileModel.setData(content);
+                        fileModel.setDataList(listList);
                         files.add(fileModel);
                     } else {
                         System.out.println("Subfile: " + fileEntry.getName());

@@ -1,6 +1,7 @@
 package com.jungo.diy.util;
 
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -8,7 +9,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -18,33 +22,44 @@ import java.util.stream.Collectors;
 /**
  * @author lichuang3
  */
+@Slf4j
 public class CsvUtils {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final LocalDate DATE_THRESHOLD = LocalDate.of(2025, 1, 17);
     private static final String HOST_NAME = "cl-gateway.tuhu.cn";
-    public static List<List<String>> getData(String str, String directoryName) {
-        if (StringUtils.isBlank(str)) {
-            return Collections.emptyList();
+    public static List<List<String>> getData(String directoryName, Path path) {
+        try (InputStream is = Files.newInputStream(path)) {
+            return getDataFromInputStream(directoryName, is);
+        } catch (IOException e) {
+            log.error("CsvUtils#getData,出现异常！", e);
         }
-        // \\R表示换行符，用于匹配任意换行符
-        String[] lines = str.split("\\R");
+        return Collections.emptyList();
+    }
+
+
+    public static List<List<String>> getDataFromInputStream(String directoryName, InputStream inputStream) {
         List<List<String>> data = new ArrayList<>();
-        for (String line : lines) {
-            String trimmedLine = line.trim();
-            if (StringUtils.isBlank(trimmedLine)) {
-                continue;
+        List<List<String>> newData = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            CSVParser parser = CSVFormat.DEFAULT.parse(reader);
+            for (CSVRecord record : parser) {
+                List<String> row = new ArrayList<>();
+                record.forEach(row::add);
+                data.add(row);
             }
-            // 去除首尾空格后按逗号分割（支持逗号前后有空格）
-            String[] parts = line.trim().split("\\s*,\\s*");
-            List<String> collect = Arrays.stream(parts).map(s -> cleanSpecialQuotes(s.trim())).collect(Collectors.toList());
-            if (checkListForSlash(collect)) {
+        } catch (IOException e) {
+            log.error("CsvUtils#getData,出现异常！", e);
+        }
+
+        for (List<String> datum : data) {
+            if (checkListForSlash(datum)) {
                 // 对collect进行处理
-                List<String> newCollect = getNewCollect(collect, directoryName);
-                data.add(newCollect);
+                List<String> newCollect = getNewCollect(datum, directoryName);
+                newData.add(newCollect);
             }
         }
-        return data;
+        return newData;
     }
 
     /**
@@ -76,9 +91,6 @@ public class CsvUtils {
      */
     public static boolean checkListForSlash(List<String> list) {
         int count = 0;
-
-
-
         // 遍历list，统计包含 "/" 的字符串个数
         for (String str : list) {
             if (containsOtherSpecialChars(str)) {

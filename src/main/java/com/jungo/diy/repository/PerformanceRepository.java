@@ -30,7 +30,11 @@ public class PerformanceRepository {
             gateWayDailyPerformanceMapper.batchInsert(gateWayDailyPerformanceEntities);
         }
         if (apiDailyPerformanceEntities != null && !apiDailyPerformanceEntities.isEmpty()) {
-            apiDailyPerformanceMapper.batchInsert(apiDailyPerformanceEntities);
+            // 分批插入apiDailyPerformanceEntities，每批1000条
+            for (int i = 0; i < apiDailyPerformanceEntities.size(); i += 1000) {
+                List<ApiDailyPerformanceEntity> subList = apiDailyPerformanceEntities.subList(i, Math.min(i + 1000, apiDailyPerformanceEntities.size()));
+                apiDailyPerformanceMapper.batchInsert(subList);
+            }
         }
     }
 }

@@ -88,8 +88,7 @@ public class FileReaderService {
                             fileName = fileName.substring(0, fileName.length() - 4);
                             PerformanceFileModel performanceFileModel = new PerformanceFileModel();
                             performanceFileModel.setFileName(fileName);
-                            String str = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-                            List<List<String>> data = CsvUtils.getData(str, directoryName);
+                            List<List<String>> data = getLists(directoryName, path);
                             performanceFileModel.setData(data);
                             files.add(performanceFileModel);
                         } catch (IOException e) {
@@ -104,6 +103,11 @@ public class FileReaderService {
         // 将性能数据写入数据库
         writeDataToDatabase(performanceFolderModel);
         return "success";
+    }
+
+    private static List<List<String>> getLists(String directoryName, Path path) throws IOException {
+
+        return CsvUtils.getData(directoryName, path);
     }
 
     public void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
@@ -128,7 +132,7 @@ public class FileReaderService {
     private List<List<String>> deduplicate(List<List<String>> requestSheetModel) {
         Map<String, List<String>> tokenMap = new HashMap<>();
         for (List<String> record : requestSheetModel) {
-            String token = (record.get(0) + record.get(1)).toLowerCase();
+            String token = (record.get(0) + record.get(1).trim()).toLowerCase();
             tokenMap.merge(token, record, (existingRecord, newRecord) -> {
                 int existingCount = Integer.parseInt(existingRecord.get(2));
                 int newCount = Integer.parseInt(newRecord.get(2));
@@ -150,9 +154,15 @@ public class FileReaderService {
         List<List<String>> requestSheetModel = deduplicate(map.get("请求情况"));
         // 域名慢查询文件
         List<List<String>> domainSlowRequestSheetModel = map.get("域名慢查询");
+        if (domainSlowRequestSheetModel == null) {
+            domainSlowRequestSheetModel = new ArrayList<>();
+        }
         Map<String, Integer> domainSlowRequestSheetModelMap = domainSlowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));
         // 域名请求情况文件
         List<List<String>> domainRequestSheetModel = map.get("域名请求情况");
+        if (domainRequestSheetModel == null) {
+            domainRequestSheetModel = new ArrayList<>();
+        }
         List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntities(domainRequestSheetModel, date, domainSlowRequestSheetModelMap);
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntities(requestSheetModel, date, slowRequestSheetModelMap);
 
@@ -162,6 +172,9 @@ public class FileReaderService {
     private List<GateWayDailyPerformanceEntity> getGateWayDailyPerformanceEntities(List<List<String>> domainRequestSheetModel,
                                                                                    Date date,
                                                                                    Map<String, Integer> domainSlowRequestSheetModelMap) {
+        if (domainRequestSheetModel == null) {
+            return Collections.emptyList();
+        }
         List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = new ArrayList<>();
         for (List<String> list : domainRequestSheetModel) {
             GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = new GateWayDailyPerformanceEntity();

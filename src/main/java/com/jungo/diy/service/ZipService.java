@@ -35,11 +35,10 @@ public class ZipService {
             // 获取文件夹下的所有文件
             for (FileModel fileModel : folderModel.getFiles()) {
                 String fileName = fileModel.getFileName();
-                String data = fileModel.getData();
                 // 将文件内容写入数据库
                 PerformanceFileModel performanceFileModel = new PerformanceFileModel();
                 performanceFileModel.setFileName(fileName);
-                List<List<String>> content = CsvUtils.getData(data, folderName);
+                List<List<String>> content = fileModel.getDataList();
                 performanceFileModel.setData(content);
                 files.add(performanceFileModel);
             }
