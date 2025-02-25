@@ -11,6 +11,11 @@ import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.PerformanceUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -343,12 +348,13 @@ public class AnalysisService {
         // 画图
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             // 定义 Sheet 名称和数据列表
-            String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率"};
+            String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率", "平均慢请求率"};
 
             createP99ModelSheet(workbook, sheetNames[0], monthP99Models, "gateway 99线", "日期", "99线", "99线");
             createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
             createSlowRequestRateModelSheet(workbook, sheetNames[2], monthSlowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
             createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
+            createAverageRowsModelSheet(workbook, sheetNames[4], performanceByYear);
 
             // 拼接完整的文件路径
             // 获取当天日期并格式化为 yyyy-MM-dd 格式
@@ -372,6 +378,57 @@ public class AnalysisService {
             log.error("FileReadController#getCharts,出现异常！", e);
         }
 
+    }
+
+    private void createAverageRowsModelSheet(XSSFWorkbook workbook,
+                                             String sheetName,
+                                             List<GateWayDailyPerformanceEntity> performanceByYear) {
+
+        // 99线
+        // 创建工作表
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+        // 写入数据
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("host");
+        headerRow.createCell(1).setCellValue("日期");
+        headerRow.createCell(2).setCellValue("999线");
+        headerRow.createCell(3).setCellValue("99线");
+        headerRow.createCell(4).setCellValue("90线");
+        headerRow.createCell(5).setCellValue("75线");
+        headerRow.createCell(6).setCellValue("50线");
+        headerRow.createCell(7).setCellValue("总请求数");
+        headerRow.createCell(8).setCellValue("慢请求数");
+        headerRow.createCell(9).setCellValue("慢请求率");
+
+        // 创建百分比格式
+        DataFormat dataFormat = workbook.createDataFormat();
+        short percentageFormat = dataFormat.getFormat("0.00%");
+        CellStyle percentageCellStyle = workbook.createCellStyle();
+        percentageCellStyle.setDataFormat(percentageFormat);
+
+        for (int i = 0; i < performanceByYear.size(); i++) {
+            Row row = sheet.createRow(i + 1);
+            GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = performanceByYear.get(i);
+            row.createCell(0).setCellValue(gateWayDailyPerformanceEntity.getHost());
+            Date date = gateWayDailyPerformanceEntity.getDate();
+            Instant instant = date.toInstant();
+            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
+            // 定义日期格式
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            // 将 LocalDate 对象转换为字符串
+            String dateString = localDate.format(formatter);
+            row.createCell(1).setCellValue(dateString);
+            row.createCell(2).setCellValue(gateWayDailyPerformanceEntity.getP999());
+            row.createCell(3).setCellValue(gateWayDailyPerformanceEntity.getP99());
+            row.createCell(4).setCellValue(gateWayDailyPerformanceEntity.getP90());
+            row.createCell(5).setCellValue(gateWayDailyPerformanceEntity.getP75());
+            row.createCell(6).setCellValue(gateWayDailyPerformanceEntity.getP50());
+            row.createCell(7).setCellValue(gateWayDailyPerformanceEntity.getTotalRequestCount());
+            row.createCell(8).setCellValue(gateWayDailyPerformanceEntity.getSlowRequestCount());
+            Cell cell = row.createCell(9);
+            cell.setCellValue(gateWayDailyPerformanceEntity.getSlowRequestRate());
+            cell.setCellStyle(percentageCellStyle);
+        }
     }
 
     private List<SlowRequestRateModel> getMonthSlowRequestRateModels(List<GateWayDailyPerformanceEntity> performanceByYear,
