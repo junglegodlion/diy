@@ -315,49 +315,55 @@ public class AnalysisService {
         return urlPerformanceResponse;
     }
 
-
+    /**
+     * 生成网关性能曲线图表并导出为Excel文件
+     * 功能：根据指定年份和起始日期，获取网关性能数据，计算各项指标（如99线、慢请求率等），生成多个工作表并输出到响应流和本地文件
+     *
+     * @param year      指定的年份，用于获取该年的性能数据
+     * @param startDate 起始日期（过去或当前日期），用于计算该月的性能指标
+     * @param response  HttpServletResponse对象，用于设置响应头并将Excel文件写入输出流
+     */
     public void getGateWayPerformanceCurveChart(Integer year, @PastOrPresent LocalDate startDate, HttpServletResponse response) {
         // 设置响应头
+        /* 配置HTTP响应头为Excel文件格式，并指定下载文件名 */
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment;filename=performance_chart.xlsx");
-        // 获取该year年的"cl-gateway.tuhu.cn"的性能数据
+        /* 获取指定年份网关性能数据并排序 */
         LocalDate date = LocalDate.of(year, 1, 1);
         String host = "cl-gateway.tuhu.cn";
         List<GateWayDailyPerformanceEntity> performanceByYear = gateWayDailyPerformanceMapper.getPerformanceByYear(host, date);
-
         // performanceByYear按照date排序
         performanceByYear.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));
 
+        /* 获取指定年份网关性能数据并排序 */
         // 获取该年的99线
         List<P99Model> yearP99Models = getNewP99Models(performanceByYear);
         // 获取该月99线
         List<P99Model> monthP99Models = getMonthP99Models(performanceByYear, startDate);
-
         // 获取该年周维度平均99线
         List<P99Model> averageP99Models = PerformanceUtils.getAverageP99Models(yearP99Models);
 
+        /* 计算不同时间维度的慢请求率 */
         // 获取该月慢请求率
         List<SlowRequestRateModel> monthSlowRequestRateModels = getMonthSlowRequestRateModels(performanceByYear, startDate);
-
         // 慢请求率
         List<SlowRequestRateModel> yearSlowRequestRateModels = getSlowRequestRateModels(performanceByYear);
-
         // 周维度慢请求率
         List<SlowRequestRateModel> averageSlowRequestRateModels = PerformanceUtils.getAverageSlowRequestRateModels(yearSlowRequestRateModels);
 
-        // 画图
+        /* 创建Excel工作簿并生成多个数据表 */
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             // 定义 Sheet 名称和数据列表
             String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率", "平均慢请求率"};
 
+            /* 生成包含不同指标的工作表 */
             createP99ModelSheet(workbook, sheetNames[0], monthP99Models, "gateway 99线", "日期", "99线", "99线");
             createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
             createSlowRequestRateModelSheet(workbook, sheetNames[2], monthSlowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
             createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
             createAverageRowsModelSheet(workbook, sheetNames[4], performanceByYear);
 
-            // 拼接完整的文件路径
-            // 获取当天日期并格式化为 yyyy-MM-dd 格式
+            /* 生成文件路径并保存到本地 */
             LocalDate currentDate = LocalDate.now();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             String formattedDate = currentDate.format(formatter);
@@ -365,14 +371,14 @@ public class AnalysisService {
             String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/图表";
             String filePath = directoryPath + "/" + fileName;
 
-            // 写入文件
+            /* 执行文件写入操作 */
             try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
                 workbook.write(fileOut);
             } catch (IOException e) {
                 log.error("ExportService#exportToExcel,出现异常！", e);
             }
 
-            // 6. 保存文件
+            /* 将工作簿写入HTTP响应输出流 */
             workbook.write(response.getOutputStream());
         } catch (Exception e) {
             log.error("FileReadController#getCharts,出现异常！", e);
@@ -399,6 +405,11 @@ public class AnalysisService {
         headerRow.createCell(7).setCellValue("总请求数");
         headerRow.createCell(8).setCellValue("慢请求数");
         headerRow.createCell(9).setCellValue("慢请求率");
+
+        headerRow.createCell(12).setCellValue("月");
+        headerRow.createCell(13).setCellValue("月维度平均慢请求率");
+
+
 
         // 创建百分比格式
         DataFormat dataFormat = workbook.createDataFormat();
@@ -428,6 +439,44 @@ public class AnalysisService {
             Cell cell = row.createCell(9);
             cell.setCellValue(gateWayDailyPerformanceEntity.getSlowRequestRate());
             cell.setCellStyle(percentageCellStyle);
+        }
+
+        // 计算月慢请求率平均值
+        // 首先将performanceByYear的date字段按照"yyyy-MM"形式进行分组
+        Map<String, List<GateWayDailyPerformanceEntity>> groupedByMonth = performanceByYear.stream()
+                .collect(Collectors.groupingBy(entity -> {
+                    LocalDate localDate = entity.getDate().toInstant()
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate();
+                    return localDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+                }));
+
+        // 求取groupedByMonth value的平均值
+        Map<String, Double> averageSlowRequestRateMap = new HashMap<>();
+        groupedByMonth.forEach((key, value) -> {
+            // 计算平均值
+            double average = value.stream()
+                    .mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate)
+                    .average()
+                    .orElse(0.0);
+            averageSlowRequestRateMap.put(key, average);
+        });
+        // 将averageSlowRequestRateMap中的key转化成list
+        List<String> keys = new ArrayList<>(averageSlowRequestRateMap.keySet());
+
+        for (int i = 0; i < keys.size(); i++) {
+            Row row = sheet.getRow(i + 1);
+            int finalI = i;
+            Map.Entry<String, Double> entry = averageSlowRequestRateMap.entrySet().stream()
+                    .filter(e -> e.getKey().equals(keys.get(finalI)))
+                    .findFirst()
+                    .orElse(null);
+            if (entry != null) {
+                row.createCell(12).setCellValue(entry.getKey());
+                Cell cell = row.createCell(13);
+                cell.setCellValue(entry.getValue());
+                cell.setCellStyle(percentageCellStyle);
+            }
         }
     }
 

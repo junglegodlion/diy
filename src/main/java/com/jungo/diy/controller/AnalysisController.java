@@ -30,7 +30,18 @@ public class AnalysisController {
     AnalysisService analysisService;
 
 
-    // 获取网关性能变化
+    /**
+     * 获取网关性能变化曲线图
+     *
+     * @param year 统计年份，用于指定查询数据的年份范围
+     * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
+     * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
+     *
+     * 函数说明：
+     * 1. 本接口处理GET请求，响应路径为"/getGateWayPerformanceCurveChart"
+     * 2. 通过analysisService生成网关性能曲线图表后，直接通过response对象返回结果
+     * 3. 日期参数通过@PastOrPresent约束确保不会使用未来日期进行查询
+     */
     @GetMapping("/getGateWayPerformanceCurveChart")
     public void getGateWayPerformanceCurveChart(@RequestParam("year") Integer year,
                                                 @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
