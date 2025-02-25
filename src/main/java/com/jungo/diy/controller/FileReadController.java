@@ -5,6 +5,7 @@ import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import com.jungo.diy.util.PerformanceUtils;
+import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Cell;
@@ -499,7 +500,7 @@ public class FileReadController {
             P99Model p99Model = new P99Model();
             p99Model.setDate(getDateString(dateDouble));
             p99Model.setPeriod(weekNumber);
-            p99Model.setP99(convertStringToInteger(list.get(3)));
+            p99Model.setP99(TableUtils.convertStringToInteger(list.get(3)));
             p99Models.add(p99Model);
         }
         return p99Models;
@@ -550,7 +551,7 @@ public class FileReadController {
 
     private List<InterfacePerformanceModel> getInterfacePerformanceModels(SheetModel requestsheetModel, SheetModel slowRequestCountSheetModel) {
         // 将slowRequestCountSheetModel转换成map
-        Map<String, Integer> slowRequestCountMap = slowRequestCountSheetModel.getData().stream().collect(Collectors.toMap(x -> x.get(0) + x.get(1), x -> convertStringToInteger(x.get(2)), (x, y) -> x));
+        Map<String, Integer> slowRequestCountMap = slowRequestCountSheetModel.getData().stream().collect(Collectors.toMap(x -> x.get(0) + x.get(1), x -> TableUtils.convertStringToInteger(x.get(2)), (x, y) -> x));
 
         // 请求情况
         List<InterfacePerformanceModel> interfacePerformanceModels = new ArrayList<>();
@@ -560,8 +561,8 @@ public class FileReadController {
             interfacePerformanceModel.setToken(token);
             interfacePerformanceModel.setHost(datum.get(0));
             interfacePerformanceModel.setUrl(datum.get(1));
-            interfacePerformanceModel.setTotalRequestCount(convertStringToInteger(datum.get(2)));
-            interfacePerformanceModel.setP99(convertStringToInteger(datum.get(4)));
+            interfacePerformanceModel.setTotalRequestCount(TableUtils.convertStringToInteger(datum.get(2)));
+            interfacePerformanceModel.setP99(TableUtils.convertStringToInteger(datum.get(4)));
             Integer slowRequestCount = slowRequestCountMap.get(token);
             if (Objects.isNull(slowRequestCount)) {
                 slowRequestCount = 0;
@@ -573,25 +574,6 @@ public class FileReadController {
         return interfacePerformanceModels;
     }
 
-    public static Integer convertStringToInteger(String input) {
-        input = input.trim();
-        try {
-            BigDecimal bd = new BigDecimal(input);
-            // 去除末尾零（如 "9.000" → "9"）
-            bd = bd.stripTrailingZeros();
-            // 若小数位 ≤ 0，说明是整数
-            if (bd.scale() <= 0) {
-                return bd.intValueExact();
-            } else {
-                throw new NumberFormatException("输入包含非整数部分: " + input);
-            }
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("无效的数字格式: " + input, e);
-        }
-    }
-
-    // 调用示例
-    Integer result = convertStringToInteger("9.0"); // 返回 9
 
     private ExcelModel readXlsxFile(MultipartFile file) throws IOException {
         // XLSX 文件读取逻辑

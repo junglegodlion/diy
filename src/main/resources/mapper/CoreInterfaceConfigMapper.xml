@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jungo.diy.mapper.CoreInterfaceConfigMapper">
+
+    <resultMap id="BaseResultMap" type="com.jungo.diy.entity.CoreInterfaceConfigEntity">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="page_name" property="pageName" jdbcType="VARCHAR"/>
+        <result column="interface_url" property="interfaceUrl" jdbcType="VARCHAR"/>
+        <result column="p99_target" property="p99Target" jdbcType="INTEGER"/>
+        <result column="slow_request_rate_target" property="slowRequestRateTarget" jdbcType="DECIMAL"/>
+        <result column="interface_type" property="interfaceType" jdbcType="INTEGER"/>
+        <result column="sort_order" property="sortOrder" jdbcType="INTEGER"/>
+        <result column="owner" property="owner" jdbcType="VARCHAR"/>
+        <result column="is_deleted" property="isDeleted" jdbcType="INTEGER"/>
+        <result column="create_time" property="createTime" jdbcType="DATE"/>
+        <result column="update_time" property="updateTime" jdbcType="DATE"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, page_name, interface_url, p99_target, slow_request_rate_target,
+        interface_type, sort_order, owner, is_deleted, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.jungo.diy.entity.CoreInterfaceConfigEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO core_interface_config (
+            page_name, interface_url, p99_target, slow_request_rate_target,
+            interface_type, sort_order, owner, is_deleted, create_time, update_time
+        )
+        VALUES (
+                   #{pageName}, #{interfaceUrl}, #{p99Target}, #{slowRequestRateTarget},
+                   #{interfaceType}, #{sortOrder}, #{owner}, #{isDeleted}, #{createTime}, #{updateTime}
+               )
+    </insert>
+
+    <update id="updateById" parameterType="com.jungo.diy.entity.CoreInterfaceConfigEntity">
+        UPDATE core_interface_config
+        <set>
+            <if test="pageName != null">page_name = #{pageName},</if>
+            <if test="interfaceUrl != null">interface_url = #{interfaceUrl},</if>
+            <if test="p99Target != null">p99_target = #{p99Target},</if>
+            <if test="slowRequestRateTarget != null">slow_request_rate_target = #{slowRequestRateTarget},</if>
+            <if test="interfaceType != null">interface_type = #{interfaceType},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="owner != null">owner = #{owner},</if>
+            <if test="isDeleted != null">is_deleted = #{isDeleted},</if>
+            <if test="updateTime != null">update_time = #{updateTime}</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM core_interface_config
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM core_interface_config
+        WHERE id = #{id}
+    </delete>
+
+    <insert id="batchInsert">
+        INSERT INTO core_interface_config(page_name, interface_url, p99_target, slow_request_rate_target,
+        interface_type, sort_order, owner)
+        VALUES
+        <foreach collection="list" item="item" index="index" separator=",">
+            (#{item.pageName}, #{item.interfaceUrl}, #{item.p99Target}, #{item.slowRequestRateTarget},
+            #{item.interfaceType}, #{item.sortOrder}, #{item.owner})
+        </foreach>
+    </insert>
+</mapper>
