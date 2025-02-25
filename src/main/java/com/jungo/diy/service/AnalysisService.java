@@ -409,6 +409,8 @@ public class AnalysisService {
         headerRow.createCell(12).setCellValue("月");
         headerRow.createCell(13).setCellValue("月维度平均慢请求率");
 
+        headerRow.createCell(15).setCellValue("最近一周平均慢请求率");
+
 
 
         // 创建百分比格式
@@ -478,6 +480,18 @@ public class AnalysisService {
                 cell.setCellStyle(percentageCellStyle);
             }
         }
+
+        // 取performanceByYear最后7个对象
+        List<GateWayDailyPerformanceEntity> last7Days = performanceByYear.subList(performanceByYear.size() - 7, performanceByYear.size());
+        // 求last7Days slowRequestRate的平均值
+        double average = last7Days.stream()
+                .mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate)
+                .average()
+                .orElse(0.0);
+        Row row = sheet.getRow(1);
+        Cell cell = row.createCell(15);
+        cell.setCellValue(average);
+        cell.setCellStyle(percentageCellStyle);
     }
 
     private List<SlowRequestRateModel> getMonthSlowRequestRateModels(List<GateWayDailyPerformanceEntity> performanceByYear,
