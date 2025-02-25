@@ -3,6 +3,7 @@ package com.jungo.diy.service;
 import com.jungo.diy.entity.CoreInterfaceConfigEntity;
 import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
 import com.jungo.diy.util.TableUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -42,7 +43,10 @@ public class CoreInterfaceConfigService {
             CoreInterfaceConfigEntity coreInterfaceConfigEntity = new CoreInterfaceConfigEntity();
             coreInterfaceConfigEntity.setPageName(list.get(0));
             coreInterfaceConfigEntity.setInterfaceUrl(list.get(1));
-            coreInterfaceConfigEntity.setP99Target(TableUtils.convertStringToInteger(list.get(2)));
+
+            if (StringUtils.isNotBlank(list.get(2))) {
+                coreInterfaceConfigEntity.setP99Target(TableUtils.convertStringToInteger(list.get(2)));
+            }
             coreInterfaceConfigEntity.setInterfaceType(TableUtils.convertStringToInteger(list.get(4)));
             coreInterfaceConfigEntity.setSortOrder(TableUtils.convertStringToInteger(list.get(5)));
             coreInterfaceConfigEntity.setOwner(list.get(6));
