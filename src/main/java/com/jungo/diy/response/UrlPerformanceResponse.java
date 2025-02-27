@@ -29,5 +29,19 @@ public class UrlPerformanceResponse {
     private Integer p99Change;
     // 99线环比
     private float p99ChangeRate;
+    // 99线目标值
+    private Integer p99Target;
+    // 是否达标
+    private Boolean reachTarget;
+
+    /**
+     * 接口类型(1-默认类型 关键路径)
+     */
+    private Integer interfaceType;
+
+    /**
+     * 接口负责人
+     */
+    private String owner;
 
 }

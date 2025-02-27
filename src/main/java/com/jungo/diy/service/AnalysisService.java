@@ -35,6 +35,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.jungo.diy.controller.FileReadController.*;
 
@@ -115,6 +116,48 @@ public class AnalysisService {
                                             LocalDate endDate,
                                             HttpServletResponse response) {
 
+        Map<String, UrlPerformanceModel> urlPerformanceModelMap = getUrlPerformanceModelMap(startDate, endDate);
+
+        // 关键链路
+        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
+
+        // 五大金刚
+        List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.FIVE_GANG_JING.getCode(), urlPerformanceModelMap);
+
+        // 首屏tab
+        List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.FIRST_SCREEN_TAB.getCode(), urlPerformanceModelMap);
+
+        // 麒麟组件接口
+        List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.QILIN_COMPONENT_INTERFACE.getCode(), urlPerformanceModelMap);
+
+        // 其他核心业务接口
+        List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.OTHER_CORE_BUSINESS_INTERFACE.getCode(), urlPerformanceModelMap);
+
+        // 访问量top30接口
+        // 首先将urlPerformanceModels排除host为"mkt-gateway.tuhu.cn"的对象，然后按照thisWeek.totalRequestCount逆序排序，最后取前30个url
+        List<UrlPerformanceModel> sortUrlPerformanceModels = urlPerformanceModelMap.values().stream()
+                .filter(urlPerformanceModel -> !"mkt-gateway.tuhu.cn".equals(urlPerformanceModel.getHost()))
+                .sorted((o1, o2) -> o2.getThisWeek().getTotalRequestCount() - o1.getThisWeek().getTotalRequestCount()).collect(Collectors.toList());
+        List<UrlPerformanceResponse> accessVolumeTop30Interface = sortUrlPerformanceModels.stream()
+                .limit(30)
+                .filter(urlPerformanceModel -> {
+                    String url = urlPerformanceModel.getUrl();
+                    return Stream.of(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses,
+                                    firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses,
+                                    otherCoreBusinessInterfaceUrlPerformanceResponses)
+                            .noneMatch(list -> coreInterfaceContains(list, url));
+                })
+                .map(urlPerformanceModel -> getUrlPerformanceResponse(urlPerformanceModel.getUrl(), urlPerformanceModelMap))
+                .collect(Collectors.toList());
+
+        try {
+            exportService.exportToExcel(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface, response);
+        } catch (IOException e) {
+            log.error("AnalysisService#getCorePerformanceCompare,出现异常！", e);
+        }
+    }
+
+    private Map<String, UrlPerformanceModel> getUrlPerformanceModelMap(LocalDate startDate, LocalDate endDate) {
         // 获取startDate这天的所有接口性能数据
         List<ApiDailyPerformanceEntity> startDateApiDailyPerformanceEntities = apiDailyPerformanceMapper.findAllByDate(startDate);
         // 获取endDate这天的所有接口性能数据
@@ -169,86 +212,58 @@ public class AnalysisService {
         }
 
         // urlPerformanceModels转成map
-        Map<String, UrlPerformanceModel> urlPerformanceModelMap = urlPerformanceModels.stream().collect(Collectors.toMap(UrlPerformanceModel::getUrl, x -> x, (x, y) -> x));
+        return urlPerformanceModels.stream().collect(Collectors.toMap(UrlPerformanceModel::getUrl, x -> x, (x, y) -> x));
+    }
 
-        // 关键链路
-        List<CoreInterfaceConfigEntity> criticalLinkInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.CRITICAL_LINK.getCode());
-        List<String> criticalLink = criticalLinkInterface.stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
+    private static boolean coreInterfaceContains(List<UrlPerformanceResponse> urlPerformanceResponses, String url) {
+        return urlPerformanceResponses.stream().anyMatch(coreInterfaceConfigEntity -> url.equals(coreInterfaceConfigEntity.getUrl()));
+    }
 
+    private List<UrlPerformanceResponse> getUrlPerformanceResponses(Integer code, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
+        List<CoreInterfaceConfigEntity> criticalLinkCoreInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(code);
         List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = new ArrayList<>();
-        for (String url : criticalLink) {
-            if (urlPerformanceModelMap.containsKey(url)) {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
+        for (CoreInterfaceConfigEntity coreInterfaceConfigEntity : criticalLinkCoreInterface) {
+            String url = coreInterfaceConfigEntity.getInterfaceUrl();
+            UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
+            if (urlPerformanceModel != null) {
+                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(urlPerformanceModel, coreInterfaceConfigEntity);
                 criticalLinkUrlPerformanceResponses.add(urlPerformanceResponse);
             }
         }
-        // 五大金刚
-        List<String> fiveGangJing = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.FIVE_GANG_JING.getCode())
-                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
-        List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses = new ArrayList<>();
-        for (String url : fiveGangJing) {
-            if (urlPerformanceModelMap.containsKey(url)) {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
-                fiveGangJingUrlPerformanceResponses.add(urlPerformanceResponse);
-            }
-        }
-        // 首屏tab
-        List<String> firstScreenTab = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.FIRST_SCREEN_TAB.getCode())
-                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
-        List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses = new ArrayList<>();
-        for (String url : firstScreenTab) {
-            if (urlPerformanceModelMap.containsKey(url)) {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
-                firstScreenTabUrlPerformanceResponses.add(urlPerformanceResponse);
-            }
-        }
-
-        // 麒麟组件接口
-        List<String> qilinComponentInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.QILIN_COMPONENT_INTERFACE.getCode())
-                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
-        List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses = new ArrayList<>();
-        for (String url : qilinComponentInterface) {
-            if (urlPerformanceModelMap.containsKey(url)) {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
-                qilinComponentInterfaceUrlPerformanceResponses.add(urlPerformanceResponse);
-            }
-        }
-
-        // 其他核心业务接口
-        List<String> otherCoreBusinessInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.OTHER_CORE_BUSINESS_INTERFACE.getCode())
-                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
-        List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses = new ArrayList<>();
-        for (String url : otherCoreBusinessInterface) {
-            if (urlPerformanceModelMap.containsKey(url)) {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
-                otherCoreBusinessInterfaceUrlPerformanceResponses.add(urlPerformanceResponse);
-            }
-        }
-        // 访问量top30接口
-        List<UrlPerformanceResponse> accessVolumeTop30Interface = new ArrayList<>();
-        // 首先将urlPerformanceModels排除host为"mkt-gateway.tuhu.cn"的对象，然后按照thisWeek.totalRequestCount逆序排序，最后取前30个url
-        List<UrlPerformanceModel> sortUrlPerformanceModels = urlPerformanceModelMap.values().stream().filter(urlPerformanceModel -> !"mkt-gateway.tuhu.cn".equals(urlPerformanceModel.getHost())).sorted((o1, o2) -> o2.getThisWeek().getTotalRequestCount() - o1.getThisWeek().getTotalRequestCount()).collect(Collectors.toList());
-
-        for (int i = 0; i < 30; i++) {
-            String url = sortUrlPerformanceModels.get(i).getUrl();
-            if (!criticalLink.contains(url)
-                    && !fiveGangJing.contains(url)
-                    && !firstScreenTab.contains(url)
-                    && !qilinComponentInterface.contains(url)
-                    && !otherCoreBusinessInterface.contains(url)) {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
-                accessVolumeTop30Interface.add(urlPerformanceResponse);
-            }
-        }
-
-        try {
-            exportService.exportToExcel(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface, response);
-        } catch (IOException e) {
-            log.error("AnalysisService#getCorePerformanceCompare,出现异常！", e);
-        }
+        return criticalLinkUrlPerformanceResponses;
     }
 
-    private static UrlPerformanceResponse getUrlPerformanceResponse(String url, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
+    private UrlPerformanceResponse getUrlPerformanceResponse(UrlPerformanceModel urlPerformanceModel, CoreInterfaceConfigEntity coreInterfaceConfigEntity) {
+        UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
+        urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
+        urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
+        urlPerformanceResponse.setLastWeekP99(urlPerformanceModel.getLastWeek().getP99());
+        urlPerformanceResponse.setThisWeekP99(urlPerformanceModel.getThisWeek().getP99());
+        urlPerformanceResponse.setLastWeekTotalRequestCount(urlPerformanceModel.getLastWeek().getTotalRequestCount());
+        urlPerformanceResponse.setThisWeekTotalRequestCount(urlPerformanceModel.getThisWeek().getTotalRequestCount());
+        urlPerformanceResponse.setLastWeekSlowRequestRate(urlPerformanceModel.getLastWeek().getSlowRequestRate());
+        urlPerformanceResponse.setThisWeekSlowRequestRate(urlPerformanceModel.getThisWeek().getSlowRequestRate());
+        urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
+        urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
+        urlPerformanceResponse.setP99Target(coreInterfaceConfigEntity.getP99Target());
+        urlPerformanceResponse.setOwner(coreInterfaceConfigEntity.getOwner());
+
+        Integer interfaceType = coreInterfaceConfigEntity.getInterfaceType();
+        urlPerformanceResponse.setInterfaceType(interfaceType);
+
+        Integer thisWeekP99 = urlPerformanceResponse.getThisWeekP99();
+        if (InterfaceTypeEnum.CRITICAL_LINK.getCode().equals(interfaceType)) {
+            Integer p99Target = urlPerformanceResponse.getP99Target();
+            urlPerformanceResponse.setReachTarget(thisWeekP99 == null || p99Target == null || thisWeekP99 <= p99Target);
+        } else {
+            // 如果慢请求率大于10%且99线变化大于30，reachTarget为false
+            urlPerformanceResponse.setReachTarget(thisWeekP99 == null || thisWeekP99 <= 0 || !(urlPerformanceModel.getThisWeek().getSlowRequestRate() >= 0.1) || urlPerformanceModel.getP99Change() < 30);
+        }
+        return urlPerformanceResponse;
+    }
+
+    private static UrlPerformanceResponse getUrlPerformanceResponse(String url,
+                                                                    Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
         UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
         UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
         urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
@@ -261,6 +276,9 @@ public class AnalysisService {
         urlPerformanceResponse.setThisWeekSlowRequestRate(urlPerformanceModel.getThisWeek().getSlowRequestRate());
         urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
         urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
+        // 99线是否达到目标值
+        urlPerformanceResponse.setReachTarget(urlPerformanceModel.getThisWeek().getP99() == null || urlPerformanceModel.getThisWeek().getP99() <= 0 || urlPerformanceModel.getThisWeek().getSlowRequestRate() >= 0.1 || urlPerformanceModel.getP99Change() < 30);
+
         return urlPerformanceResponse;
     }
 

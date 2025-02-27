@@ -85,7 +85,7 @@ public class ExportService {
 
         // 创建表头
         Row headerRow = sheet.createRow(0);
-        String[] headers = {"host", "url", "上周99线", "本周99线", "上周请求总数", "本周请求总数", "上周慢请求率", "本周慢请求率", "99线变化", "99线变化率"};
+        String[] headers = {"host", "url", "上周99线", "本周99线", "上周请求总数", "本周请求总数", "上周慢请求率", "本周慢请求率", "99线变化", "99线变化率", "是否达标"};
         for (int i = 0; i < headers.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(headers[i]);
@@ -121,6 +121,7 @@ public class ExportService {
             Cell p99ChangeRateCell = row.createCell(9);
             p99ChangeRateCell.setCellValue(urlPerformanceResponse.getP99ChangeRate());
             p99ChangeRateCell.setCellStyle(percentageCellStyle);
+            row.createCell(10).setCellValue(urlPerformanceResponse.getReachTarget());
         }
 
         // 自动调整列宽
