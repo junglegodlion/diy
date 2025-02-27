@@ -112,7 +112,7 @@ public class AnalysisService {
         return p99Models;
     }
 
-    public void getCorePerformanceCompare(LocalDate startDate,
+    public String getCorePerformanceCompare(LocalDate startDate,
                                             LocalDate endDate,
                                             HttpServletResponse response) {
 
@@ -150,11 +150,49 @@ public class AnalysisService {
                 .map(urlPerformanceModel -> getUrlPerformanceResponse(urlPerformanceModel.getUrl(), urlPerformanceModelMap))
                 .collect(Collectors.toList());
 
+        List<UrlPerformanceResponse>[] dataLists = new List[]{
+                criticalLinkUrlPerformanceResponses,
+                fiveGangJingUrlPerformanceResponses,
+                firstScreenTabUrlPerformanceResponses,
+                qilinComponentInterfaceUrlPerformanceResponses,
+                otherCoreBusinessInterfaceUrlPerformanceResponses,
+                accessVolumeTop30Interface
+        };
+
         try {
-            exportService.exportToExcel(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface, response);
+            exportService.exportToExcel(dataLists, response);
         } catch (IOException e) {
             log.error("AnalysisService#getCorePerformanceCompare,出现异常！", e);
         }
+
+        // 返回未达标的接口：格式如下：【轮胎列表页】/cl-tire-site/tireListModule/getTireList 99线：513ms 99线基线目标：450ms  @平会
+        return getUnReachTargetUrl(dataLists);
+    }
+
+    private String getUnReachTargetUrl(List<UrlPerformanceResponse>[] dataLists) {
+        StringBuilder str = new StringBuilder("未达标接口有：\n");
+        List<UrlPerformanceResponse> dataList = dataLists[0];
+        // 取出dataList不达标的数据
+        for (UrlPerformanceResponse urlPerformanceResponse : dataList) {
+            if (!urlPerformanceResponse.getReachTarget()) {
+                str.append("【").append(urlPerformanceResponse.getPageName()).append("】").append(urlPerformanceResponse.getUrl()).append(" 99线：").append(urlPerformanceResponse.getThisWeekP99()).append("ms 99线基线目标：").append(urlPerformanceResponse.getP99Target()).append("ms  @").append(urlPerformanceResponse.getOwner()).append("\n");
+            }
+            // jungo TODO 2025/2/27:性能不满足要去30 10%
+        }
+
+        for (int i = 1; i < dataLists.length; i++) {
+            List<UrlPerformanceResponse> performanceResponses = dataLists[i];
+            // 取出dataList不达标的数据【轮胎列表主接口】/cl-tire-site/tireList/getCombineList 99线变化：+94ms  @平会
+            for (UrlPerformanceResponse urlPerformanceResponse : performanceResponses) {
+                if (!urlPerformanceResponse.getReachTarget()) {
+                    str.append("【").append(urlPerformanceResponse.getPageName()).append("】").append(urlPerformanceResponse.getUrl()).append(" 99线变化：").append(urlPerformanceResponse.getP99Change()).append("ms  @").append(urlPerformanceResponse.getOwner()).append("\n");
+                }
+            }
+
+        }
+        String string = str.toString();
+        System.out.println(string);
+        return str.toString();
     }
 
     private Map<String, UrlPerformanceModel> getUrlPerformanceModelMap(LocalDate startDate, LocalDate endDate) {
@@ -236,6 +274,7 @@ public class AnalysisService {
     private UrlPerformanceResponse getUrlPerformanceResponse(UrlPerformanceModel urlPerformanceModel, CoreInterfaceConfigEntity coreInterfaceConfigEntity) {
         UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
         urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
+        urlPerformanceResponse.setPageName(coreInterfaceConfigEntity.getPageName());
         urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
         urlPerformanceResponse.setLastWeekP99(urlPerformanceModel.getLastWeek().getP99());
         urlPerformanceResponse.setThisWeekP99(urlPerformanceModel.getThisWeek().getP99());
@@ -256,8 +295,10 @@ public class AnalysisService {
             Integer p99Target = urlPerformanceResponse.getP99Target();
             urlPerformanceResponse.setReachTarget(thisWeekP99 == null || p99Target == null || thisWeekP99 <= p99Target);
         } else {
-            // 如果慢请求率大于10%且99线变化大于30，reachTarget为false
-            urlPerformanceResponse.setReachTarget(thisWeekP99 == null || thisWeekP99 <= 0 || !(urlPerformanceModel.getThisWeek().getSlowRequestRate() >= 0.1) || urlPerformanceModel.getP99Change() < 30);
+            // 如果99线变化率大于10%&&99线变化大于30，reachTarget为false。否则是true
+            float p99ChangeRate = urlPerformanceResponse.getP99ChangeRate();
+            Integer p99Change = urlPerformanceResponse.getP99Change();
+            urlPerformanceResponse.setReachTarget(!(p99ChangeRate > 0.1f) || p99Change <= 30);
         }
         return urlPerformanceResponse;
     }

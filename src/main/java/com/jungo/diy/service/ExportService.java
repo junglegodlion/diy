@@ -23,25 +23,12 @@ import java.util.List;
 @Slf4j
 public class ExportService {
 
-    public void exportToExcel(List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses,
-                              List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses,
-                              List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses,
-                              List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses,
-                              List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses,
-                              List<UrlPerformanceResponse> accessVolumeTop30Interface,
-                              HttpServletResponse response) throws IOException {
+    public void exportToExcel(List<UrlPerformanceResponse>[] dataLists, HttpServletResponse response) throws IOException {
         // 创建工作簿
         try (Workbook workbook = new XSSFWorkbook()) {
             // 定义 Sheet 名称和数据列表
             String[] sheetNames = {"关键链路", "五大金刚", "首屏Tab", "麒麟组件接口", "其他核心业务接口", "访问量top30接口"};
-            List<UrlPerformanceResponse>[] dataLists = new List[]{
-                    criticalLinkUrlPerformanceResponses,
-                    fiveGangJingUrlPerformanceResponses,
-                    firstScreenTabUrlPerformanceResponses,
-                    qilinComponentInterfaceUrlPerformanceResponses,
-                    otherCoreBusinessInterfaceUrlPerformanceResponses,
-                    accessVolumeTop30Interface
-            };
+
 
             // 创建多个 Sheet 并写入数据
             for (int i = 0; i < sheetNames.length; i++) {

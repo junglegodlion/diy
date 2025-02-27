@@ -221,8 +221,15 @@ public class FileReadController {
                         accessVolumeTop30Interface.add(urlPerformanceResponse);
                     }
         }
-
-        exportService.exportToExcel(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface, response);
+        List<UrlPerformanceResponse>[] dataLists = new List[]{
+                criticalLinkUrlPerformanceResponses,
+                fiveGangJingUrlPerformanceResponses,
+                firstScreenTabUrlPerformanceResponses,
+                qilinComponentInterfaceUrlPerformanceResponses,
+                otherCoreBusinessInterfaceUrlPerformanceResponses,
+                accessVolumeTop30Interface
+        };
+        exportService.exportToExcel(dataLists, response);
     }
 
 

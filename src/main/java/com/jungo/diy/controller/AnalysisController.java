@@ -69,7 +69,7 @@ public class AnalysisController {
 
     // 获取某号和某号的核心接口性能对比数据
     @GetMapping("/getCorePerformanceCompare")
-    public void getCorePerformanceCompare(@RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
+    public String getCorePerformanceCompare(@RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
                                           @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
                                           HttpServletResponse response) throws UnsupportedEncodingException {
         if (endDate.isBefore(startDate)) {
@@ -81,6 +81,6 @@ public class AnalysisController {
             throw new IllegalArgumentException("查询时间跨度不能超过31天");
         }
 
-        analysisService.getCorePerformanceCompare(startDate, endDate, response);
+        return analysisService.getCorePerformanceCompare(startDate, endDate, response);
     }
 }

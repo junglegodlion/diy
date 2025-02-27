@@ -11,6 +11,10 @@ public class UrlPerformanceResponse {
 
     // host
     private String host;
+    /**
+     * 页面名称
+     */
+    private String pageName;
     // url
     private String url;
     // 上周99线
