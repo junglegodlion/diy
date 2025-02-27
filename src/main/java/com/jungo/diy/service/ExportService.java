@@ -121,7 +121,16 @@ public class ExportService {
             Cell p99ChangeRateCell = row.createCell(9);
             p99ChangeRateCell.setCellValue(urlPerformanceResponse.getP99ChangeRate());
             p99ChangeRateCell.setCellStyle(percentageCellStyle);
-            row.createCell(10).setCellValue(urlPerformanceResponse.getReachTarget());
+            Boolean reachTarget = urlPerformanceResponse.getReachTarget();
+            Cell reachTargetCell = row.createCell(10);
+            reachTargetCell.setCellValue(reachTarget);
+            // 如果reachTarget为false，将单元格置红
+            if (!reachTarget) {
+                reachTargetCell.setCellStyle(workbook.createCellStyle());
+                reachTargetCell.getCellStyle().setFillForegroundColor(IndexedColors.RED.getIndex());
+                reachTargetCell.getCellStyle().setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            }
+
         }
 
         // 自动调整列宽
