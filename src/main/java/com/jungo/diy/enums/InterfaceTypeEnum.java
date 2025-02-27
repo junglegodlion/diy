@@ -2,9 +2,22 @@ package com.jungo.diy.enums;
 
 import lombok.Getter;
 
+/**
+ * @author lichuang3
+ */
+
 @Getter
 public enum InterfaceTypeEnum {
-    DEFAULT(1, "默认类型 关键路径");
+    // 关键路径
+    CRITICAL_LINK(1, "默认类型 关键路径"),
+    // 五大金刚
+    FIVE_GANG_JING(2, "五大金刚"),
+    // 首屏tab
+    FIRST_SCREEN_TAB(3, "首屏tab"),
+    // 麒麟组件接口
+    QILIN_COMPONENT_INTERFACE(4, "麒麟组件接口"),
+    // 其他核心业务接口
+    OTHER_CORE_BUSINESS_INTERFACE(5, "其他核心业务接口");
 
     private final Integer code;
     private final String description;

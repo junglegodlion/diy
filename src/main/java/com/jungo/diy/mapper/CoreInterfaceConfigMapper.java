@@ -13,4 +13,6 @@ import java.util.List;
 public interface CoreInterfaceConfigMapper {
     // 批量插入CoreInterfaceConfigEntity
     int batchInsert(List<CoreInterfaceConfigEntity> list);
+    // 获取指定接口类型的接口，按接口排序值排序
+    List<CoreInterfaceConfigEntity> getCoreInterfaceConfigByInterfaceType(Integer interfaceType);
 }

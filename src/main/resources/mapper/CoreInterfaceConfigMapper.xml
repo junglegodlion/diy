@@ -68,4 +68,11 @@
             #{item.interfaceType}, #{item.sortOrder}, #{item.owner})
         </foreach>
     </insert>
+
+    <select id="getCoreInterfaceConfigByInterfaceType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM core_interface_config
+        WHERE interface_type = #{interfaceType} AND is_deleted = 0
+        ORDER BY sort_order
+    </select>
 </mapper>

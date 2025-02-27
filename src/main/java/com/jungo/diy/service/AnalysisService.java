@@ -1,8 +1,11 @@
 package com.jungo.diy.service;
 
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
+import com.jungo.diy.entity.CoreInterfaceConfigEntity;
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
+import com.jungo.diy.enums.InterfaceTypeEnum;
 import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
+import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
 import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.P99Model;
@@ -44,11 +47,12 @@ import static com.jungo.diy.controller.FileReadController.*;
 public class AnalysisService {
     @Autowired
     private ApiDailyPerformanceMapper apiDailyPerformanceMapper;
-
     @Autowired
     private ExportService exportService;
     @Autowired
     private GateWayDailyPerformanceMapper gateWayDailyPerformanceMapper;
+    @Autowired
+    private CoreInterfaceConfigMapper coreInterfaceConfigMapper;
 
     public String get99LineCurve(String url, LocalDate startDate, LocalDate endDate, HttpServletResponse response) {
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
@@ -168,22 +172,10 @@ public class AnalysisService {
         Map<String, UrlPerformanceModel> urlPerformanceModelMap = urlPerformanceModels.stream().collect(Collectors.toMap(UrlPerformanceModel::getUrl, x -> x, (x, y) -> x));
 
         // 关键链路
-        List<String> criticalLink = new ArrayList<>();
-        // 向列表中添加数据
-        criticalLink.add("/cl-tire-site/tireListModule/getTireList");
-        criticalLink.add("/cl-maint-api/maintMainline/getBasicMaintainData");
-        criticalLink.add("/cl-maint-mainline/mainline/getDynamicData");
-        criticalLink.add("/cl-oto-front-api/batteryList/getBatteryList");
-        criticalLink.add("/mlp-product-search-api/module/search/pageList");
-        criticalLink.add("/mlp-product-search-api/main/search/api/mainProduct");
-        criticalLink.add("/ext-website-cl-beauty-api/channelPage/v4/getBeautyHomeShopListAndRecommendLabel");
-        criticalLink.add("/cl-product-components/GoodsDetail/detailModuleInfo");
-        criticalLink.add("/cl-tire-site/tireModule/getTireDetailModuleData");
-        criticalLink.add("/cl-maint-mainline/productMainline/getMaintProductDetailInfo");
-        criticalLink.add("/cl-ordering-aggregator/ordering/getOrderConfirmFloatLayerData");
-        criticalLink.add("/cl-maint-order-create/order/getConfirmOrderData");
+        List<CoreInterfaceConfigEntity> criticalLinkInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.CRITICAL_LINK.getCode());
+        List<String> criticalLink = criticalLinkInterface.stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
 
-        List<UrlPerformanceResponse>  criticalLinkUrlPerformanceResponses = new ArrayList<>();
+        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = new ArrayList<>();
         for (String url : criticalLink) {
             if (urlPerformanceModelMap.containsKey(url)) {
                 UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(url, urlPerformanceModelMap);
@@ -191,19 +183,8 @@ public class AnalysisService {
             }
         }
         // 五大金刚
-        List<String> fiveGangJing = new ArrayList<>();
-        fiveGangJing.add("/cl-maint-api/apinew/GetBaoYangAppPackages");
-        fiveGangJing.add("/cl-maint-api/apinew/getBasicMaintainData");
-        fiveGangJing.add("/cl-tire-site/tireList/getCombineList");
-        fiveGangJing.add("/cl-tire-site/tireList/getFilterItem");
-        fiveGangJing.add("/ext-website-cl-beauty-api/channelPage/v4/getBeautyHomeModule");
-        fiveGangJing.add("/ext-website-cl-beauty-api/channelPage/v4/getCategoryAndShopList");
-        fiveGangJing.add("/ext-website-cl-beauty-api/channelPage/v4/getBeautyShopList");
-        fiveGangJing.add("/ext-website-cl-beauty-api/beautyIndex/getCategoryAndShopListV2");
-        fiveGangJing.add("/ext-website-cl-beauty-api/beautyIndex/getBeautyShopListV2");
-        fiveGangJing.add("/cl-list-aggregator/channel/getChannelModuleInfo");
-        fiveGangJing.add("/cl-repair-mainline/mainline/v4/getCategoryList");
-        fiveGangJing.add("/cl-repair-mainline/mainline/v4/getDynamicData");
+        List<String> fiveGangJing = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.FIVE_GANG_JING.getCode())
+                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
         List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses = new ArrayList<>();
         for (String url : fiveGangJing) {
             if (urlPerformanceModelMap.containsKey(url)) {
@@ -212,24 +193,8 @@ public class AnalysisService {
             }
         }
         // 首屏tab
-        List<String> firstScreenTab = new ArrayList<>();
-        firstScreenTab.add("/cl-homepage-service/homePage/getHomePageInfo");
-        firstScreenTab.add("/cl-homepage-service/cmsService/getInterfaceData");
-        firstScreenTab.add("/cl-homepage-service/tabBarService/getNewTabBars");
-        firstScreenTab.add("/cl-homepage-service/homePage/speciallySaleRecommend");
-        firstScreenTab.add("/cl-user-info-site/userVehicle/getEstimateMileage");
-        firstScreenTab.add("/cl-user-info-site/maint-record/car-latest-condition");
-        firstScreenTab.add("/cl-user-car-site/maint-record/mergeList");
-        firstScreenTab.add("/cl-shop-api/shopTab/getModuleForC");
-        firstScreenTab.add("/cl-shop-api/shopFilterItem/getShopFilterItemList");
-        firstScreenTab.add("/cl-shop-api/shopList/getMainShopList");
-        firstScreenTab.add("/cl-common-api/api/personalCenter/getNewQaMsgV2");
-        firstScreenTab.add("/cl-common-api/api/personalCenter/getPersonalOrderInfo");
-        firstScreenTab.add("/cl-common-api/api/personalCenter/getPersonalProductInfo");
-        firstScreenTab.add("/cl-common-api/api/personalCenter/getCmsModuleList");
-        firstScreenTab.add("/cl-common-api/api/personalCenter/getNewOrderInfo");
-        firstScreenTab.add("/cl-common-api/api/personalCenter/getTopBanner");
-        firstScreenTab.add("/cl-common-api/api/personalCenter/getAutoSuperConfig");
+        List<String> firstScreenTab = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.FIRST_SCREEN_TAB.getCode())
+                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
         List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses = new ArrayList<>();
         for (String url : firstScreenTab) {
             if (urlPerformanceModelMap.containsKey(url)) {
@@ -239,19 +204,8 @@ public class AnalysisService {
         }
 
         // 麒麟组件接口
-        List<String> qilinComponentInterface = new ArrayList<>();
-        qilinComponentInterface.add("/cl-maint-api/activity/getProducts");
-        qilinComponentInterface.add("/cl-maint-api/greatValueCard/getActivityCards");
-        qilinComponentInterface.add("/cl-maint-api/activity/getSpikeDynamicPackages");
-        qilinComponentInterface.add("/cl-tire-site/activityPage/getKylinActivityPageProductList");
-        qilinComponentInterface.add("/ext-website-cl-beauty-api/beautyKylin/getShopList");
-        qilinComponentInterface.add("/cl-car-product-api/Product/getChannelActivityComponent");
-        qilinComponentInterface.add("/cl-car-product-api/Product/getActivityComponentDetail");
-        qilinComponentInterface.add("/cl-oto-front-api/battery/BatteryActivityComponentDetail");
-        qilinComponentInterface.add("/cl-shop-api/component/getKylinShopList");
-        qilinComponentInterface.add("/cl-kael-agg-service/salePlan/getCombinedCommodityPool");
-        qilinComponentInterface.add("/cl-common-api/api/memberPlus/getPlusCardChannelInfo");
-
+        List<String> qilinComponentInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.QILIN_COMPONENT_INTERFACE.getCode())
+                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
         List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses = new ArrayList<>();
         for (String url : qilinComponentInterface) {
             if (urlPerformanceModelMap.containsKey(url)) {
@@ -261,13 +215,8 @@ public class AnalysisService {
         }
 
         // 其他核心业务接口
-        List<String> otherCoreBusinessInterface = new ArrayList<>();
-        otherCoreBusinessInterface.add("/ext-website-cl-beauty-api/beautyProduct/getBeautyProductDetailV2");
-        otherCoreBusinessInterface.add("/cl-ordering-aggregator/ordering/getOrderConfirmData");
-        otherCoreBusinessInterface.add("/ext-website-cl-beauty-api/order/getOrderCheckInfo");
-        otherCoreBusinessInterface.add("/cl-ordering-aggregator/ordering/createOrder");
-        otherCoreBusinessInterface.add("/cl-maint-order-create/order/createorder");
-
+        List<String> otherCoreBusinessInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(InterfaceTypeEnum.OTHER_CORE_BUSINESS_INTERFACE.getCode())
+                .stream().map(CoreInterfaceConfigEntity::getInterfaceUrl).collect(Collectors.toList());
         List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses = new ArrayList<>();
         for (String url : otherCoreBusinessInterface) {
             if (urlPerformanceModelMap.containsKey(url)) {
