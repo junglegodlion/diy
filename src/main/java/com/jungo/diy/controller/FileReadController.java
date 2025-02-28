@@ -372,7 +372,7 @@ public class FileReadController {
         configureP99ModelsChartData(chart, sheet, xTitle, yTitle, seriesTitle);
     }
 
-    private static void configureP99ModelsChartData(XSSFChart chart,
+    public static void configureP99ModelsChartData(XSSFChart chart,
                                              XSSFSheet sheet,
                                              String xTitle,
                                              String yTitle,

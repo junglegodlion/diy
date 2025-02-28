@@ -18,8 +18,7 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -549,5 +548,52 @@ public class AnalysisService {
             result.add(slowRequestRateModel);
         }
         return result;
+    }
+
+    public String batchGet99LineCurve(String[] urls, @PastOrPresent LocalDate startDate, LocalDate endDate, HttpServletResponse response) {
+        Map<String, List<P99Model>> urlMap = new HashMap<>();
+        for (String url : urls) {
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
+            // apiDailyPerformanceEntities按照日期排序
+            apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
+            List<P99Model> p99Models = getP99Models(apiDailyPerformanceEntities);
+            urlMap.put(url, p99Models);
+        }
+
+        // 画图
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            // 定义 Sheet 名称和数据列表
+            // 创建多个 Sheet 并写入数据
+            for (String url : urls) {
+                createP99Sheet(workbook, url, urlMap.get(url));
+            }
+            // 6. 保存文件
+            workbook.write(response.getOutputStream());
+        } catch (Exception e) {
+            log.error("AnalysisService#get99LineCurve,出现异常！", e);
+        }
+        return "success";
+    }
+
+    private static void createP99Sheet(XSSFWorkbook workbook, String url, List<P99Model> p99Models) {
+        // 99线
+        // 创建工作表
+        // 将url按照"/"分割，取最后一个元素作为sheetName
+        String sheetName = url.substring(url.lastIndexOf("/") + 1);
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+        // 写入数据
+        createP99ModelsData(sheet, p99Models);
+        // 3. 创建绘图对象
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
+        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
+        int endCol = anchor.getCol1() + chartWidthCols;
+        anchor.setCol2(anchor.getCol1() + endCol);
+        // 4. 创建图表对象
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText("gateway 99线");
+        chart.setTitleOverlay(false);
+        // 5. 配置图表数据
+        configureP99ModelsChartData(chart, sheet, "日期",  "99线", "99线");
     }
 }

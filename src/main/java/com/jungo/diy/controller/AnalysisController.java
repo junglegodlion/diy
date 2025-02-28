@@ -67,6 +67,22 @@ public class AnalysisController {
         return analysisService.get99LineCurve(url, startDate, endDate, response);
     }
 
+    @GetMapping("/batchGet99LineCurve")
+    public String get99LineCurve(@RequestParam("urls") String[] urls,
+                                 @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+                                 @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+                                 HttpServletResponse response) {
+        // 日期范围校验
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("结束日期不能早于开始日期");
+        }
+
+        // 设置响应头
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment;filename=batchGet99LineCurve_chart.xlsx");
+        return analysisService.batchGet99LineCurve(urls, startDate, endDate, response);
+    }
+
     // 获取某号和某号的核心接口性能对比数据
     @GetMapping("/getCorePerformanceCompare")
     public String getCorePerformanceCompare(@RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
