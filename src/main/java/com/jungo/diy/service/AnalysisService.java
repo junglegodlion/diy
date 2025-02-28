@@ -318,8 +318,7 @@ public class AnalysisService {
         urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
         urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
         // 99线是否达到目标值
-        urlPerformanceResponse.setReachTarget(urlPerformanceModel.getThisWeek().getP99() == null || urlPerformanceModel.getThisWeek().getP99() <= 0 || urlPerformanceModel.getThisWeek().getSlowRequestRate() >= 0.1 || urlPerformanceModel.getP99Change() < 30);
-
+        urlPerformanceResponse.setReachTarget(!(urlPerformanceModel.getP99ChangeRate() >= 0.1) || urlPerformanceModel.getP99Change() < 30);
         return urlPerformanceResponse;
     }
 
