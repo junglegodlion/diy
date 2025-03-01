@@ -22,6 +22,16 @@ public class WordDocumentGenerator {
         // 创建一个新的Word文档
         XWPFDocument document = new XWPFDocument();
 
+        // ▼▼▼▼▼▼▼▼▼▼ 新增标题代码 ▼▼▼▼▼▼▼▼▼▼
+        XWPFParagraph titleParagraph = document.createParagraph();
+        titleParagraph.setAlignment(ParagraphAlignment.CENTER);
+        XWPFRun titleRun = titleParagraph.createRun();
+        titleRun.setText("DIY实验报告");
+        titleRun.setBold(true);
+        titleRun.setFontSize(22);
+        titleRun.addBreak(BreakType.TEXT_WRAPPING);
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
         // 创建段落
         XWPFParagraph paragraph = document.createParagraph();
         // 创建文本运行
