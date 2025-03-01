@@ -3,6 +3,8 @@ package com.jungo.diy.service;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -50,6 +52,37 @@ public class WordDocumentGenerator {
         } catch (IOException e) {
             throw new RuntimeException("图片加载失败", e);
         }
+
+        // 插入表格前创建段落
+        XWPFParagraph tableParagraph = document.createParagraph();
+        tableParagraph.createRun().addBreak(); // 添加空行分隔
+
+        XWPFTable table = document.createTable(3, 3);
+
+        // 设置表格宽度（占页面宽度的100%）
+        table.setWidth("100%");
+
+        // 设置表格边框（必须）
+        CTTblBorders borders = table.getCTTbl().addNewTblPr().addNewTblBorders();
+        borders.addNewBottom().setVal(STBorder.SINGLE);
+        borders.addNewLeft().setVal(STBorder.SINGLE);
+        borders.addNewRight().setVal(STBorder.SINGLE);
+        borders.addNewTop().setVal(STBorder.SINGLE);
+        borders.addNewInsideH().setVal(STBorder.SINGLE);
+        borders.addNewInsideV().setVal(STBorder.SINGLE);
+
+        // 填充单元格内容
+        for (int i = 0; i < 3; i++) {
+            XWPFTableRow row = table.getRow(i);
+            for (int j = 0; j < 3; j++) {
+                XWPFTableCell cell = row.getCell(j);
+                cell.setText("Cell " + (i+1) + "-" + (j+1));
+
+                // 设置单元格垂直居中
+                cell.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
+            }
+        }
+
 
 
         // 保存文档
