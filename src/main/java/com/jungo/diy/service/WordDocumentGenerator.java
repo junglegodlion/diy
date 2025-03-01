@@ -20,49 +20,20 @@ public class WordDocumentGenerator {
 
     public static void generateWordDocument(String filePath) throws IOException, InvalidFormatException {
         // 创建一个新的Word文档
-        XWPFDocument document = new XWPFDocument();
-
-        // ▼▼▼▼▼▼▼▼▼▼ 新增标题代码 ▼▼▼▼▼▼▼▼▼▼
-        XWPFParagraph titleParagraph = document.createParagraph();
-        titleParagraph.setAlignment(ParagraphAlignment.CENTER);
-        XWPFRun titleRun = titleParagraph.createRun();
-        titleRun.setText("DIY实验报告");
-        titleRun.setBold(true);
-        titleRun.setFontSize(22);
-        titleRun.addBreak(BreakType.TEXT_WRAPPING);
-        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-        // 创建段落
-        XWPFParagraph paragraph = document.createParagraph();
-        // 创建文本运行
-        XWPFRun run = paragraph.createRun();
-        run.setText("这是一个使用Apache POI生成的Word文档。");
-        // 创建图片段落
-        XWPFParagraph imageParagraph = document.createParagraph();
-        imageParagraph.setAlignment(ParagraphAlignment.CENTER);
-
-        XWPFRun imageRun = imageParagraph.createRun();
-        try (InputStream inputStream = WordDocumentGenerator.class.getResourceAsStream("/images/img.png")) {
-            // 包装成支持mark/reset的缓冲流
-            BufferedInputStream bufferedStream = new BufferedInputStream(inputStream);
-            // 关键点：设置标记
-            bufferedStream.mark(Integer.MAX_VALUE);
-
-            BufferedImage originalImage = ImageIO.read(bufferedStream);
-            bufferedStream.reset();  // 关键点：重置到标记位置
-
-            imageRun.addPicture(
-                    bufferedStream,
-                    XWPFDocument.PICTURE_TYPE_PNG,
-                    "img.png",
-                    Units.toEMU(originalImage.getWidth() / 72f * 2.54)*6,
-                    Units.toEMU(originalImage.getHeight() / 72f * 2.54)*6
-            );
-            System.out.println("原始尺寸：" + originalImage.getWidth() + "x" + originalImage.getHeight());
-        } catch (IOException e) {
-            throw new RuntimeException("图片加载失败", e);
+        try (XWPFDocument document = new XWPFDocument()) {
+            setTitle(document);
+            setText(document);
+            setImage(document);
+            setTable(document);
+            // 保存文档
+            try (FileOutputStream out = new FileOutputStream(filePath)) {
+                document.write(out);
+            }
         }
 
+    }
+
+    private static void setTable(XWPFDocument document) {
         // 插入表格前创建段落
         XWPFParagraph tableParagraph = document.createParagraph();
         tableParagraph.createRun().addBreak(); // 添加空行分隔
@@ -86,19 +57,60 @@ public class WordDocumentGenerator {
             XWPFTableRow row = table.getRow(i);
             for (int j = 0; j < 3; j++) {
                 XWPFTableCell cell = row.getCell(j);
-                cell.setText("Cell " + (i+1) + "-" + (j+1));
+                cell.setText("Cell " + (i + 1) + "-" + (j + 1));
 
                 // 设置单元格垂直居中
                 cell.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
             }
         }
+    }
 
+    private static void setImage(XWPFDocument document) throws InvalidFormatException {
+        // 创建图片段落
+        XWPFParagraph imageParagraph = document.createParagraph();
+        imageParagraph.setAlignment(ParagraphAlignment.CENTER);
+        XWPFRun imageRun = imageParagraph.createRun();
+        try (InputStream inputStream = WordDocumentGenerator.class.getResourceAsStream("/images/img.png")) {
+            if (inputStream == null) {
+                throw new IOException("图片资源未找到：/images/img.png");
+            }
+            BufferedInputStream bufferedStream = new BufferedInputStream(inputStream);
+            // 关键点：设置标记
+            bufferedStream.mark(Integer.MAX_VALUE);
 
+            BufferedImage originalImage = ImageIO.read(bufferedStream);
+            bufferedStream.reset();  // 关键点：重置到标记位置
 
-        // 保存文档
-        try (FileOutputStream out = new FileOutputStream(filePath)) {
-            document.write(out);
+            imageRun.addPicture(
+                    bufferedStream,
+                    XWPFDocument.PICTURE_TYPE_PNG,
+                    "img.png",
+                    Units.toEMU(originalImage.getWidth() / 72f * 2.54) * 6,
+                    Units.toEMU(originalImage.getHeight() / 72f * 2.54) * 6
+            );
+            System.out.println("原始尺寸：" + originalImage.getWidth() + "x" + originalImage.getHeight());
+        } catch (IOException e) {
+            throw new RuntimeException("图片加载失败", e);
         }
+    }
 
+    private static void setText(XWPFDocument document) {
+        // 创建段落
+        XWPFParagraph paragraph = document.createParagraph();
+        // 创建文本运行
+        XWPFRun run = paragraph.createRun();
+        run.setText("这是一个使用Apache POI生成的Word文档。");
+    }
+
+    private static void setTitle(XWPFDocument document) {
+        // ▼▼▼▼▼▼▼▼▼▼ 新增标题代码 ▼▼▼▼▼▼▼▼▼▼
+        XWPFParagraph titleParagraph = document.createParagraph();
+        titleParagraph.setAlignment(ParagraphAlignment.CENTER);
+        XWPFRun titleRun = titleParagraph.createRun();
+        titleRun.setText("DIY实验报告");
+        titleRun.setBold(true);
+        titleRun.setFontSize(22);
+        titleRun.addBreak(BreakType.TEXT_WRAPPING);
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     }
 }
