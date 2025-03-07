@@ -48,8 +48,7 @@ public class WordDocumentGenerator {
             setTitle(document, "核心接口监控接口");
             setText(document, "一、关键路径");
             // 获取关键路径的接口数据
-
-            setTable(document);
+            setCriticalLinkTable(document, criticalLinkUrlPerformanceResponses);
             setImage(document);
             setTable(document);
             // 保存文档
@@ -58,6 +57,40 @@ public class WordDocumentGenerator {
             }
         }
 
+    }
+
+    private static void setCriticalLinkTable(XWPFDocument document, List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses) {
+        // 插入表格前创建段落
+        XWPFParagraph tableParagraph = document.createParagraph();
+        tableParagraph.createRun().addBreak(); // 添加空行分隔
+
+        XWPFTable table = document.createTable(criticalLinkUrlPerformanceResponses.size() + 1, 3);
+
+        // 设置表格宽度（占页面宽度的100%）
+        table.setWidth("100%");
+
+        // 设置表格边框（必须）
+        CTTblBorders borders = table.getCTTbl().addNewTblPr().addNewTblBorders();
+        borders.addNewBottom().setVal(STBorder.SINGLE);
+        borders.addNewLeft().setVal(STBorder.SINGLE);
+        borders.addNewRight().setVal(STBorder.SINGLE);
+        borders.addNewTop().setVal(STBorder.SINGLE);
+        borders.addNewInsideH().setVal(STBorder.SINGLE);
+        borders.addNewInsideV().setVal(STBorder.SINGLE);
+
+        // 设置表格表头
+        XWPFTableRow headerRow = table.getRow(0);
+        XWPFTableCell pageNameCell = headerRow.getCell(0);
+        pageNameCell.setText("pageName");
+        pageNameCell.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
+
+        // 填充单元格内容
+        for (int i = 0; i < criticalLinkUrlPerformanceResponses.size(); i++) {
+            XWPFTableRow row = table.getRow(i + 1);
+            UrlPerformanceResponse urlPerformanceResponse = criticalLinkUrlPerformanceResponses.get(i);
+            XWPFTableCell cell = row.getCell(0);
+            cell.setText(urlPerformanceResponse.getPageName());
+        }
     }
 
     private static void setTable(XWPFDocument document) {
