@@ -86,8 +86,8 @@ public class AnalysisController {
     // 获取某号和某号的核心接口性能对比数据
     @GetMapping("/getCorePerformanceCompare")
     public String getCorePerformanceCompare(@RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-                                          @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-                                          HttpServletResponse response) throws UnsupportedEncodingException {
+                                            @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+                                            HttpServletResponse response) {
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
         }

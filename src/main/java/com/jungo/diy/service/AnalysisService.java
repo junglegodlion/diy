@@ -1,16 +1,14 @@
 package com.jungo.diy.service;
 
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
-import com.jungo.diy.entity.CoreInterfaceConfigEntity;
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.enums.InterfaceTypeEnum;
 import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
-import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
 import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
-import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.P99Model;
 import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
+import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.PerformanceUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +50,7 @@ public class AnalysisService {
     @Autowired
     private GateWayDailyPerformanceMapper gateWayDailyPerformanceMapper;
     @Autowired
-    private CoreInterfaceConfigMapper coreInterfaceConfigMapper;
+    private PerformanceRepository performanceRepository;
 
     public String get99LineCurve(String url, LocalDate startDate, LocalDate endDate, HttpServletResponse response) {
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
@@ -115,22 +113,21 @@ public class AnalysisService {
                                             LocalDate endDate,
                                             HttpServletResponse response) {
 
-        Map<String, UrlPerformanceModel> urlPerformanceModelMap = getUrlPerformanceModelMap(startDate, endDate);
-
+        Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
         // 关键链路
-        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
+        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
 
         // 五大金刚
-        List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.FIVE_GANG_JING.getCode(), urlPerformanceModelMap);
+        List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.FIVE_GANG_JING.getCode(), urlPerformanceModelMap);
 
         // 首屏tab
-        List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.FIRST_SCREEN_TAB.getCode(), urlPerformanceModelMap);
+        List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.FIRST_SCREEN_TAB.getCode(), urlPerformanceModelMap);
 
         // 麒麟组件接口
-        List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.QILIN_COMPONENT_INTERFACE.getCode(), urlPerformanceModelMap);
+        List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.QILIN_COMPONENT_INTERFACE.getCode(), urlPerformanceModelMap);
 
         // 其他核心业务接口
-        List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses = getUrlPerformanceResponses(InterfaceTypeEnum.OTHER_CORE_BUSINESS_INTERFACE.getCode(), urlPerformanceModelMap);
+        List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.OTHER_CORE_BUSINESS_INTERFACE.getCode(), urlPerformanceModelMap);
 
         // 访问量top30接口
         // 首先将urlPerformanceModels排除host为"mkt-gateway.tuhu.cn"的对象，然后按照thisWeek.totalRequestCount逆序排序，最后取前30个url
@@ -194,112 +191,8 @@ public class AnalysisService {
         return str.toString();
     }
 
-    private Map<String, UrlPerformanceModel> getUrlPerformanceModelMap(LocalDate startDate, LocalDate endDate) {
-        // 获取startDate这天的所有接口性能数据
-        List<ApiDailyPerformanceEntity> startDateApiDailyPerformanceEntities = apiDailyPerformanceMapper.findAllByDate(startDate);
-        // 获取endDate这天的所有接口性能数据
-        List<ApiDailyPerformanceEntity> endDateApiDailyPerformanceEntities = apiDailyPerformanceMapper.findAllByDate(endDate);
-        // 上周的接口性能数据
-        List<InterfacePerformanceModel> lastWeek = startDateApiDailyPerformanceEntities.stream().map(x -> {
-            InterfacePerformanceModel newInterfacePerformanceModel = new InterfacePerformanceModel();
-            newInterfacePerformanceModel.setToken(x.getHost() + x.getUrl());
-            newInterfacePerformanceModel.setHost(x.getHost());
-            newInterfacePerformanceModel.setUrl(x.getUrl());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setP99(x.getP99());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setSlowRequestCount(x.getSlowRequestCount());
-
-            return newInterfacePerformanceModel;
-        }).collect(Collectors.toList());
-        // 本周的接口性能数据
-        List<InterfacePerformanceModel> thisWeek = endDateApiDailyPerformanceEntities.stream().map(x -> {
-            InterfacePerformanceModel newInterfacePerformanceModel = new InterfacePerformanceModel();
-            newInterfacePerformanceModel.setToken(x.getHost() + x.getUrl());
-            newInterfacePerformanceModel.setHost(x.getHost());
-            newInterfacePerformanceModel.setUrl(x.getUrl());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setP99(x.getP99());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setSlowRequestCount(x.getSlowRequestCount());
-
-            return newInterfacePerformanceModel;
-        }).collect(Collectors.toList());
-
-        // 将lastWeek转换成map
-        Map<String, InterfacePerformanceModel> lastWeekMap = lastWeek.stream().collect(Collectors.toMap(InterfacePerformanceModel::getToken, x -> x, (x, y) -> x));
-        // 将thisWeek转换成map
-        Map<String, InterfacePerformanceModel> thisWeekMap = thisWeek.stream().collect(Collectors.toMap(InterfacePerformanceModel::getToken, x -> x, (x, y) -> x));
-        // 组装UrlPerformanceModel对象
-        List<UrlPerformanceModel> urlPerformanceModels = new ArrayList<>();
-        for (Map.Entry<String, InterfacePerformanceModel> entry : thisWeekMap.entrySet()) {
-            String token = entry.getKey();
-            InterfacePerformanceModel thisWeekInterfacePerformanceModel = entry.getValue();
-            InterfacePerformanceModel lastWeekInterfacePerformanceModel = lastWeekMap.get(token);
-            if (Objects.nonNull(lastWeekInterfacePerformanceModel)) {
-                UrlPerformanceModel urlPerformanceModel = new UrlPerformanceModel();
-                urlPerformanceModel.setToken(token);
-                urlPerformanceModel.setHost(thisWeekInterfacePerformanceModel.getHost());
-                urlPerformanceModel.setUrl(thisWeekInterfacePerformanceModel.getUrl());
-                urlPerformanceModel.setLastWeek(lastWeekInterfacePerformanceModel);
-                urlPerformanceModel.setThisWeek(thisWeekInterfacePerformanceModel);
-                urlPerformanceModels.add(urlPerformanceModel);
-            }
-
-        }
-
-        // urlPerformanceModels转成map
-        return urlPerformanceModels.stream().collect(Collectors.toMap(UrlPerformanceModel::getUrl, x -> x, (x, y) -> x));
-    }
-
     private static boolean coreInterfaceContains(List<UrlPerformanceResponse> urlPerformanceResponses, String url) {
         return urlPerformanceResponses.stream().anyMatch(coreInterfaceConfigEntity -> url.equals(coreInterfaceConfigEntity.getUrl()));
-    }
-
-    private List<UrlPerformanceResponse> getUrlPerformanceResponses(Integer code, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
-        List<CoreInterfaceConfigEntity> criticalLinkCoreInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(code);
-        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = new ArrayList<>();
-        for (CoreInterfaceConfigEntity coreInterfaceConfigEntity : criticalLinkCoreInterface) {
-            String url = coreInterfaceConfigEntity.getInterfaceUrl();
-            UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
-            if (urlPerformanceModel != null) {
-                UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(urlPerformanceModel, coreInterfaceConfigEntity);
-                criticalLinkUrlPerformanceResponses.add(urlPerformanceResponse);
-            }
-        }
-        return criticalLinkUrlPerformanceResponses;
-    }
-
-    private UrlPerformanceResponse getUrlPerformanceResponse(UrlPerformanceModel urlPerformanceModel, CoreInterfaceConfigEntity coreInterfaceConfigEntity) {
-        UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
-        urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
-        urlPerformanceResponse.setPageName(coreInterfaceConfigEntity.getPageName());
-        urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
-        urlPerformanceResponse.setLastWeekP99(urlPerformanceModel.getLastWeek().getP99());
-        urlPerformanceResponse.setThisWeekP99(urlPerformanceModel.getThisWeek().getP99());
-        urlPerformanceResponse.setLastWeekTotalRequestCount(urlPerformanceModel.getLastWeek().getTotalRequestCount());
-        urlPerformanceResponse.setThisWeekTotalRequestCount(urlPerformanceModel.getThisWeek().getTotalRequestCount());
-        urlPerformanceResponse.setLastWeekSlowRequestRate(urlPerformanceModel.getLastWeek().getSlowRequestRate());
-        urlPerformanceResponse.setThisWeekSlowRequestRate(urlPerformanceModel.getThisWeek().getSlowRequestRate());
-        urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
-        urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
-        urlPerformanceResponse.setP99Target(coreInterfaceConfigEntity.getP99Target());
-        urlPerformanceResponse.setOwner(coreInterfaceConfigEntity.getOwner());
-
-        Integer interfaceType = coreInterfaceConfigEntity.getInterfaceType();
-        urlPerformanceResponse.setInterfaceType(interfaceType);
-
-        Integer thisWeekP99 = urlPerformanceResponse.getThisWeekP99();
-        if (InterfaceTypeEnum.CRITICAL_LINK.getCode().equals(interfaceType)) {
-            Integer p99Target = urlPerformanceResponse.getP99Target();
-            urlPerformanceResponse.setReachTarget(thisWeekP99 == null || p99Target == null || thisWeekP99 <= p99Target);
-        } else {
-            // 如果99线变化率大于10%&&99线变化大于30，reachTarget为false。否则是true
-            float p99ChangeRate = urlPerformanceResponse.getP99ChangeRate();
-            Integer p99Change = urlPerformanceResponse.getP99Change();
-            urlPerformanceResponse.setReachTarget(!(p99ChangeRate > 0.1f) || p99Change <= 30);
-        }
-        return urlPerformanceResponse;
     }
 
     private static UrlPerformanceResponse getUrlPerformanceResponse(String url,
