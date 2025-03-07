@@ -487,6 +487,81 @@ public class AnalysisService {
         chart.setTitleText("gateway 99线");
         chart.setTitleOverlay(false);
         // 5. 配置图表数据
-        configureP99ModelsChartData(chart, sheet, "日期",  "99线", "99线");
+        configurePerformanceLineChartData(chart, sheet, "日期",  "99线", "99线");
+    }
+
+    public String batchGetSlowRequestRateCurve(String[] urls,
+                                               @PastOrPresent LocalDate startDate,
+                                               LocalDate endDate,
+                                               HttpServletResponse response) {
+        Map<String, List<SlowRequestRateModel>> urlMap = new HashMap<>();
+        for (String url : urls) {
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.getSlowRequestRate(url, startDate, endDate);
+            // apiDailyPerformanceEntities按照日期排序
+            apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
+            List<SlowRequestRateModel> slowRequestRateModels = getSlowRequestRateModelsNew(apiDailyPerformanceEntities);
+            urlMap.put(url, slowRequestRateModels);
+        }
+
+        // 画图
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            // 定义 Sheet 名称和数据列表
+            // 创建多个 Sheet 并写入数据
+            for (String url : urls) {
+                createSlowRequestRateSheet(workbook, url, urlMap.get(url));
+            }
+            // 6. 保存文件
+            workbook.write(response.getOutputStream());
+        } catch (Exception e) {
+            log.error("AnalysisService#get99LineCurve,出现异常！", e);
+        }
+        return "success";
+    }
+
+    private void createSlowRequestRateSheet(XSSFWorkbook workbook,
+                                            String url,
+                                            List<SlowRequestRateModel> slowRequestRateModels) {
+        // 创建工作表
+        // 将url按照"/"分割，取最后一个元素作为sheetName
+        String sheetName = url.substring(url.lastIndexOf("/") + 1);
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+        // 写入数据
+        createSlowRequestRateModelsData(sheet, slowRequestRateModels);
+        // 3. 创建绘图对象
+        XSSFDrawing drawing = sheet.createDrawingPatriarch();
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
+        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
+        int endCol = anchor.getCol1() + chartWidthCols;
+        anchor.setCol2(anchor.getCol1() + endCol);
+        // 4. 创建图表对象
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText("gateway 慢请求率");
+        chart.setTitleOverlay(false);
+        // 5. 配置图表数据
+        // 性能折线图
+        configurePerformanceLineChartData(chart, sheet, "日期",  "慢请求率", "慢请求率");
+    }
+
+    private List<SlowRequestRateModel> getSlowRequestRateModelsNew(List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities) {
+        List<SlowRequestRateModel> slowRequestRateModels = new ArrayList<>();
+        for (ApiDailyPerformanceEntity apiDailyPerformanceEntity : apiDailyPerformanceEntities) {
+            SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
+            Date date = apiDailyPerformanceEntity.getDate();
+            // 将 Date 对象转换为 LocalDate 对象
+            Instant instant = date.toInstant();
+            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
+            // 定义日期格式
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            // 将 LocalDate 对象转换为字符串
+            String dateString = localDate.format(formatter);
+            slowRequestRateModel.setDate(dateString);
+            double totalRequests = apiDailyPerformanceEntity.getTotalRequestCount();
+            double slowRequestRate = totalRequests > 0
+                    ? (double) apiDailyPerformanceEntity.getSlowRequestCount() / totalRequests
+                    : 0.0;
+            slowRequestRateModel.setSlowRequestRate(slowRequestRate);
+            slowRequestRateModels.add(slowRequestRateModel);
+        }
+        return slowRequestRateModels;
     }
 }

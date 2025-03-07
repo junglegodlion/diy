@@ -87,7 +87,6 @@ public class PerformanceRepository {
             newInterfacePerformanceModel.setP99(x.getP99());
             newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
             newInterfacePerformanceModel.setSlowRequestCount(x.getSlowRequestCount());
-
             return newInterfacePerformanceModel;
         }).collect(Collectors.toList());
 

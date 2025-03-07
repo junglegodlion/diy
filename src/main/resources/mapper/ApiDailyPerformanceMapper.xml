@@ -39,4 +39,8 @@
     <select id="findAllByDate" resultMap="BaseResultMap">
         SELECT * FROM api_daily_performance WHERE date = #{date}
     </select>
+
+    <select id="getSlowRequestRate" resultMap="BaseResultMap">
+        SELECT * FROM api_daily_performance WHERE url = #{url} AND date BETWEEN #{startDate} AND #{endDate}
+    </select>
 </mapper>

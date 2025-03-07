@@ -28,7 +28,6 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletResponse;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -318,7 +317,7 @@ public class FileReadController {
         chart.setTitleText(titleText);
         chart.setTitleOverlay(false);
         // 5. 配置图表数据
-        configureP99ModelsChartData(chart, sheet, xTitle, yTitle, seriesTitle);
+        configurePerformanceLineChartData(chart, sheet, xTitle, yTitle, seriesTitle);
 
     }
 
@@ -369,14 +368,14 @@ public class FileReadController {
         chart.setTitleText(titleText);
         chart.setTitleOverlay(false);
         // 5. 配置图表数据
-        configureP99ModelsChartData(chart, sheet, xTitle, yTitle, seriesTitle);
+        configurePerformanceLineChartData(chart, sheet, xTitle, yTitle, seriesTitle);
     }
 
-    public static void configureP99ModelsChartData(XSSFChart chart,
-                                             XSSFSheet sheet,
-                                             String xTitle,
-                                             String yTitle,
-                                             String seriesTitle) {
+    public static void configurePerformanceLineChartData(XSSFChart chart,
+                                                         XSSFSheet sheet,
+                                                         String xTitle,
+                                                         String yTitle,
+                                                         String seriesTitle) {
         // 1. 创建数据源引用
         int lastRowNum = sheet.getLastRowNum();
         CellRangeAddress categoryRange = new CellRangeAddress(1, lastRowNum, 0, 0);
@@ -443,6 +442,23 @@ public class FileReadController {
         // 填充数据行
         List<String> dates = p99Models.stream().map(P99Model::getDate).collect(Collectors.toList());
         List<Integer> p99Values = p99Models.stream().map(P99Model::getP99).collect(Collectors.toList());
+
+        for (int i = 0; i < dates.size(); i++) {
+            Row row = sheet.createRow(i + 1);
+            row.createCell(0).setCellValue(dates.get(i));
+            row.createCell(1).setCellValue(p99Values.get(i));
+        }
+
+    }
+
+    public static void createSlowRequestRateModelsData(XSSFSheet sheet, List<SlowRequestRateModel> slowRequestRateModels) {
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("日期");
+        headerRow.createCell(1).setCellValue("慢请求率");
+
+        // 填充数据行
+        List<String> dates = slowRequestRateModels.stream().map(SlowRequestRateModel::getDate).collect(Collectors.toList());
+        List<Double> p99Values = slowRequestRateModels.stream().map(SlowRequestRateModel::getSlowRequestRate).collect(Collectors.toList());
 
         for (int i = 0; i < dates.size(); i++) {
             Row row = sheet.createRow(i + 1);

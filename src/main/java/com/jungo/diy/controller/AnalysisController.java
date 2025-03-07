@@ -13,7 +13,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.PastOrPresent;
 
-import java.io.UnsupportedEncodingException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
@@ -81,6 +80,23 @@ public class AnalysisController {
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment;filename=batchGet99LineCurve_chart.xlsx");
         return analysisService.batchGet99LineCurve(urls, startDate, endDate, response);
+    }
+
+    // 获取接口慢请求率的变化曲线
+    @GetMapping("/batchGetSlowRequestRateCurve")
+    public String batchGetSlowRequestRateCurve(@RequestParam("urls") String[] urls,
+                                 @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+                                 @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+                                 HttpServletResponse response) {
+        // 日期范围校验
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("结束日期不能早于开始日期");
+        }
+
+        // 设置响应头
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment;filename=batchGet99LineCurve_chart.xlsx");
+        return analysisService.batchGetSlowRequestRateCurve(urls, startDate, endDate, response);
     }
 
     // 获取某号和某号的核心接口性能对比数据

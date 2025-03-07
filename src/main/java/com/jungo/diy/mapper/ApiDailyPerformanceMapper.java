@@ -6,7 +6,6 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDate;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -27,4 +26,6 @@ public interface ApiDailyPerformanceMapper {
     List<ApiDailyPerformanceEntity> findUrl99Line(@Param("url")String url, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     List<ApiDailyPerformanceEntity> findAllByDate(LocalDate startDate);
+
+    List<ApiDailyPerformanceEntity> getSlowRequestRate(@Param("url")String url, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }
