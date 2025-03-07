@@ -1,6 +1,10 @@
+
 package com.jungo.diy.controller;
 
 import com.jungo.diy.service.AnalysisService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -12,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.PastOrPresent;
-
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
@@ -23,11 +26,11 @@ import java.time.temporal.ChronoUnit;
 @RestController
 @Slf4j
 @RequestMapping("/analysis")
+@Api(tags = "Analysis Controller", description = "API for analysis operations")
 public class AnalysisController {
 
     @Autowired
     AnalysisService analysisService;
-
 
     /**
      * 获取网关性能变化曲线图
@@ -35,26 +38,31 @@ public class AnalysisController {
      * @param year 统计年份，用于指定查询数据的年份范围
      * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
      * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
-     *
-     * 函数说明：
-     * 1. 本接口处理GET请求，响应路径为"/getGateWayPerformanceCurveChart"
-     * 2. 通过analysisService生成网关性能曲线图表后，直接通过response对象返回结果
-     * 3. 日期参数通过@PastOrPresent约束确保不会使用未来日期进行查询
      */
     @GetMapping("/getGateWayPerformanceCurveChart")
-    public void getGateWayPerformanceCurveChart(@RequestParam("year") Integer year,
-                                                @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
-                                                HttpServletResponse response) {
+    @ApiOperation(value = "获取网关性能变化曲线图", notes = "通过analysisService生成网关性能曲线图表后，直接通过response对象返回结果")
+    public void getGateWayPerformanceCurveChart(
+            @ApiParam(value = "统计年份", required = true) @RequestParam("year") Integer year,
+            @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+            HttpServletResponse response) {
         analysisService.getGateWayPerformanceCurveChart(year, startDate, response);
     }
 
-
-    // 获取某一接口几号到几号的99线变化曲线
+    /**
+     * 获取某一接口几号到几号的99线变化曲线
+     *
+     * @param url 接口URL
+     * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
+     * @param endDate 结束日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围终点
+     * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
+     */
     @GetMapping("/get99LineCurve")
-    public String get99LineCurve(@RequestParam("url") @NotBlank(message = "URL不能为空") String url,
-                                 @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
-                                 @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-                                 HttpServletResponse response) {
+    @ApiOperation(value = "获取某一接口几号到几号的99线变化曲线", notes = "通过analysisService生成99线变化曲线图表后，直接通过response对象返回结果")
+    public String get99LineCurve(
+            @ApiParam(value = "接口URL", required = true) @RequestParam("url") @NotBlank(message = "URL不能为空") String url,
+            @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+            @ApiParam(value = "结束日期（格式：yyyy-MM-dd）", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            HttpServletResponse response) {
         // 日期范围校验
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
@@ -66,11 +74,21 @@ public class AnalysisController {
         return analysisService.get99LineCurve(url, startDate, endDate, response);
     }
 
+    /**
+     * 批量获取接口几号到几号的99线变化曲线
+     *
+     * @param urls 接口URL数组
+     * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
+     * @param endDate 结束日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围终点
+     * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
+     */
     @GetMapping("/batchGet99LineCurve")
-    public String get99LineCurve(@RequestParam("urls") String[] urls,
-                                 @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
-                                 @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-                                 HttpServletResponse response) {
+    @ApiOperation(value = "批量获取接口几号到几号的99线变化曲线", notes = "通过analysisService批量生成99线变化曲线图表后，直接通过response对象返回结果")
+    public String batchGet99LineCurve(
+            @ApiParam(value = "接口URL数组", required = true) @RequestParam("urls") String[] urls,
+            @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+            @ApiParam(value = "结束日期（格式：yyyy-MM-dd）", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            HttpServletResponse response) {
         // 日期范围校验
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
@@ -82,12 +100,21 @@ public class AnalysisController {
         return analysisService.batchGet99LineCurve(urls, startDate, endDate, response);
     }
 
-    // 获取接口慢请求率的变化曲线
+    /**
+     * 批量获取接口慢请求率的变化曲线
+     *
+     * @param urls 接口URL数组
+     * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
+     * @param endDate 结束日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围终点
+     * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
+     */
     @GetMapping("/batchGetSlowRequestRateCurve")
-    public String batchGetSlowRequestRateCurve(@RequestParam("urls") String[] urls,
-                                 @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
-                                 @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-                                 HttpServletResponse response) {
+    @ApiOperation(value = "批量获取接口慢请求率的变化曲线", notes = "通过analysisService批量生成慢请求率变化曲线图表后，直接通过response对象返回结果")
+    public String batchGetSlowRequestRateCurve(
+            @ApiParam(value = "接口URL数组", required = true) @RequestParam("urls") String[] urls,
+            @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+            @ApiParam(value = "结束日期（格式：yyyy-MM-dd）", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            HttpServletResponse response) {
         // 日期范围校验
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
@@ -99,11 +126,19 @@ public class AnalysisController {
         return analysisService.batchGetSlowRequestRateCurve(urls, startDate, endDate, response);
     }
 
-    // 获取某号和某号的核心接口性能对比数据
+    /**
+     * 获取某号和某号的核心接口性能对比数据
+     *
+     * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
+     * @param endDate 结束日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围终点
+     * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
+     */
     @GetMapping("/getCorePerformanceCompare")
-    public String getCorePerformanceCompare(@RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-                                            @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
-                                            HttpServletResponse response) {
+    @ApiOperation(value = "获取某号和某号的核心接口性能对比数据", notes = "通过analysisService生成核心接口性能对比数据后，直接通过response对象返回结果")
+    public String getCorePerformanceCompare(
+            @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
+            @ApiParam(value = "结束日期（格式：yyyy-MM-dd）", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            HttpServletResponse response) {
         if (endDate.isBefore(startDate)) {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
         }
