@@ -1,6 +1,7 @@
 
 package com.jungo.diy.controller;
 
+import com.jungo.diy.config.RequestContext;
 import com.jungo.diy.service.AnalysisService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -68,10 +69,14 @@ public class AnalysisController {
             throw new IllegalArgumentException("结束日期不能早于开始日期");
         }
 
+        // 写入上下文
+        RequestContext.put("startDate",  startDate);
+        RequestContext.put("endDate",  endDate);
+
         // 设置响应头
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment;filename=get99LineCurve_chart.xlsx");
-        return analysisService.get99LineCurve(url, startDate, endDate, response);
+        return analysisService.get99LineCurve(url, response);
     }
 
     /**

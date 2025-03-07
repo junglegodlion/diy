@@ -1,5 +1,6 @@
 package com.jungo.diy.service;
 
+import com.jungo.diy.config.RequestContext;
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.enums.InterfaceTypeEnum;
@@ -52,7 +53,9 @@ public class AnalysisService {
     @Autowired
     private PerformanceRepository performanceRepository;
 
-    public String get99LineCurve(String url, LocalDate startDate, LocalDate endDate, HttpServletResponse response) {
+    public String get99LineCurve(String url, HttpServletResponse response) {
+        LocalDate startDate = RequestContext.getAs("startDate", LocalDate.class);
+        LocalDate endDate = RequestContext.getAs("endDate", LocalDate.class);
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
         // apiDailyPerformanceEntities按照日期排序
         apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
