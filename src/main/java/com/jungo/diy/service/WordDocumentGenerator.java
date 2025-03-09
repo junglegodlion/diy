@@ -1,10 +1,13 @@
 package com.jungo.diy.service;
 
+import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.enums.InterfaceTypeEnum;
 import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.util.DateUtils;
+import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.Units;
@@ -25,6 +28,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import static com.jungo.diy.util.DateUtils.YYYY_MM;
+import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
 /**
  * @author lichuang3
@@ -59,26 +65,32 @@ public class WordDocumentGenerator {
     public void generateWordDocument(String filePath,
                                      LocalDate startDate,
                                      LocalDate endDate) throws IOException, InvalidFormatException {
-
+        /*获取表格数据*/
+        // 月平均慢请求率
         List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
+        // 获取周大盘数据数据情况
+        List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationtable(startDate, endDate);
+
         Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
         // 关键链路
         List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
 
         // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
-            // 获取新建文档对象的样式
-            XWPFStyles newStyles = document.createStyles();
-            // 关键行// 修改设置文档样式为静态块中读取到的样式
-            // 参考：https://blog.csdn.net/hollycloud/article/details/120453185
-            newStyles.setStyles(wordStyles);
-            // 一级标题
-            setTitle(document, "慢请求率");
-            // 表格是动态的，现在是几月，就要有几行
+            setWordStyle(document);
+
+            /*cl-gateway 月平均慢请求率*/
+            setFirstLevelTitle(document, "cl-gateway 月平均慢请求率");
             drawGatewayMonthlyAverageSlowRequestRateTable(document, gatewayAverageSlowRequestRate);
 
+            /*周大盘数据数据情况*/
+            String startDateStr = DateUtils.getDateString(startDate, YYYY_MM_DD);
+            String endDateStr = DateUtils.getDateString(endDate, YYYY_MM_DD);
+            setFirstLevelTitle(document, startDateStr + "~" + endDateStr + " 大盘数据数据情况");
+            drawWeeklyMarketDataSituationTable(document, weeklyMarketDataSituationData);
+
             // 核心接口监控接口
-            setTitle(document, "核心接口监控接口");
+            setFirstLevelTitle(document, "核心接口监控接口");
             setText(document, "一、关键路径");
             // 获取关键路径的接口数据
             setCriticalLinkTable(document, criticalLinkUrlPerformanceResponses);
@@ -92,28 +104,53 @@ public class WordDocumentGenerator {
 
     }
 
+    private void drawWeeklyMarketDataSituationTable(XWPFDocument document, List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData) {
+
+        int rows = weeklyMarketDataSituationData.size();
+        XWPFTable table = TableUtils.createXwpfTable(document, rows + 1, 9);
+
+        /*设置表格表头*/
+        XWPFTableRow headerRow = table.getRow(0);
+        headerRow.getCell(0).setText("日期");
+        headerRow.getCell(1).setText("999线");
+        headerRow.getCell(2).setText("99线");
+        headerRow.getCell(3).setText("90线");
+        headerRow.getCell(4).setText("75线");
+        headerRow.getCell(5).setText("50线");
+        headerRow.getCell(6).setText("总请求数");
+        headerRow.getCell(7).setText("慢请求数");
+        headerRow.getCell(8).setText("慢请求率");
+
+        // 填充表格内容
+        for (int i = 0; i < rows; i++) {
+            XWPFTableRow row = table.getRow(i + 1);
+            GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = weeklyMarketDataSituationData.get(i);
+            row.getCell(0).setText(DateUtils.getDateString(gateWayDailyPerformanceEntity.getDate(), YYYY_MM_DD));
+            row.getCell(1).setText(String.valueOf(gateWayDailyPerformanceEntity.getP999()));
+            row.getCell(2).setText(String.valueOf(gateWayDailyPerformanceEntity.getP99()));
+            row.getCell(3).setText(String.valueOf(gateWayDailyPerformanceEntity.getP90()));
+            row.getCell(4).setText(String.valueOf(gateWayDailyPerformanceEntity.getP75()));
+            row.getCell(5).setText(String.valueOf(gateWayDailyPerformanceEntity.getP50()));
+            row.getCell(6).setText(String.valueOf(gateWayDailyPerformanceEntity.getTotalRequestCount()));
+            row.getCell(7).setText(String.valueOf(gateWayDailyPerformanceEntity.getSlowRequestCount()));
+            row.getCell(8).setText(TableUtils.getPercentageFormatString(gateWayDailyPerformanceEntity.getSlowRequestRate()));
+        }
+    }
+
+
+
+    private static void setWordStyle(XWPFDocument document) {
+        // 获取新建文档对象的样式
+        XWPFStyles newStyles = document.createStyles();
+        // 关键行// 修改设置文档样式为静态块中读取到的样式
+        // 参考：https://blog.csdn.net/hollycloud/article/details/120453185
+        newStyles.setStyles(wordStyles);
+    }
+
     private static void drawGatewayMonthlyAverageSlowRequestRateTable(XWPFDocument document, List<SlowRequestRateModel> gatewayAverageSlowRequestRate) {
         // 获取当前月份
         int currentMonth = LocalDate.now().getMonthValue();
-        // 插入表格前创建段落
-        XWPFParagraph tableParagraph = document.createParagraph();
-        tableParagraph.createRun().addBreak(); // 添加空行分隔
-
-        // 创建表格，行数为当前月份 + 1（表头行），列数为3
-        XWPFTable table = document.createTable(2, currentMonth);
-
-        // 设置表格宽度（占页面宽度的100%）
-        table.setWidth("100%");
-
-        // 设置表格边框（必须）
-        CTTblBorders borders = table.getCTTbl().addNewTblPr().addNewTblBorders();
-        borders.addNewBottom().setVal(STBorder.SINGLE);
-        borders.addNewLeft().setVal(STBorder.SINGLE);
-        borders.addNewRight().setVal(STBorder.SINGLE);
-        borders.addNewTop().setVal(STBorder.SINGLE);
-        borders.addNewInsideH().setVal(STBorder.SINGLE);
-        borders.addNewInsideV().setVal(STBorder.SINGLE);
-
+        XWPFTable table = TableUtils.createXwpfTable(document, 2, currentMonth);
         // 设置表格表头
         XWPFTableRow headerRow = table.getRow(0);
         int year = LocalDate.now().getYear();
@@ -126,18 +163,10 @@ public class WordDocumentGenerator {
         // 填充表格内容
         for (int i = 0; i < currentMonth; i++) {
             double slowRequestRate = gatewayAverageSlowRequestRate.get(i).getSlowRequestRate();
-            // slowRequestRate转化是百分数，保留2位小数
-            DecimalFormat df = new DecimalFormat("0.00%");
-            // 可选：设置四舍五入模式（默认HALF_EVEN）
-            df.setRoundingMode(RoundingMode.HALF_UP);
-            row.getCell(i).setText(df.format(slowRequestRate));
+            String format = TableUtils.getPercentageFormatString(slowRequestRate);
+            row.getCell(i).setText(format);
         }
     }
-
-    public static void main(String[] args) {
-        System.out.println(LocalDate.now().getMonthValue());
-    }
-
 
     private static void setCriticalLinkTable(XWPFDocument document, List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses) {
         // 插入表格前创建段落
@@ -242,8 +271,7 @@ public class WordDocumentGenerator {
         run.setText(text);
     }
 
-    private static void setTitle(XWPFDocument document, String title) {
-
+    private static void setFirstLevelTitle(XWPFDocument document, String title) {
         // 创建段落
         XWPFParagraph titleParagraph = document.createParagraph();
         // 设置为“标题1”样式

@@ -4,6 +4,7 @@ import com.jungo.diy.model.*;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
+import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.PerformanceUtils;
 import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ import java.time.temporal.WeekFields;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 import static com.jungo.diy.util.ExcelChartGenerator.*;
 
 
@@ -275,8 +277,7 @@ public class FileReadController {
             // 拼接完整的文件路径
             // 获取当天日期并格式化为 yyyy-MM-dd 格式
             LocalDate currentDate = LocalDate.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String formattedDate = currentDate.format(formatter);
+            String formattedDate = DateUtils.getDateString(currentDate, YYYY_MM_DD);
             String fileName = URLEncoder.encode(formattedDate + "_chart.xlsx", StandardCharsets.UTF_8.toString());
             String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/图表";
             String filePath = directoryPath + "/" + fileName;
@@ -294,6 +295,8 @@ public class FileReadController {
             log.error("FileReadController#getCharts,出现异常！", e);
         }
     }
+
+
 
     public static void createSlowRequestRateModelSheet(XSSFWorkbook workbook,
                                                  String sheetName,
@@ -519,7 +522,7 @@ public class FileReadController {
             if (specifyDate != null && localDate.isBefore(specifyDate)) {
                 continue;
             }
-            int weekNumber = getWeekNumber(localDate);
+            int weekNumber = DateUtils.getWeekNumber(localDate);
             P99Model p99Model = new P99Model();
             p99Model.setDate(getDateString(dateDouble));
             p99Model.setPeriod(weekNumber);
@@ -527,12 +530,6 @@ public class FileReadController {
             p99Models.add(p99Model);
         }
         return p99Models;
-    }
-
-    public static int getWeekNumber(LocalDate localDate) {
-        // 使用ISO周规则计算周数
-        WeekFields weekFields = WeekFields.ISO;
-        return localDate.get(weekFields.weekOfWeekBasedYear());
     }
 
     private static String getDateString(double excelSerialNumber) {

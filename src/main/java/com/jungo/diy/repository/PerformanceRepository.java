@@ -11,6 +11,7 @@ import com.jungo.diy.model.InterfacePerformanceModel;
 import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.util.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -163,7 +164,7 @@ public class PerformanceRepository {
     public List<SlowRequestRateModel> getGatewayAverageSlowRequestRate(int year) {
         List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = gateWayDailyPerformanceMapper.getPerformanceByYear("cl-gateway.tuhu.cn", LocalDate.of(year, 1, 1));
         // 将gateWayDailyPerformanceEntities按照月份进行分组
-        Map<Integer, List<GateWayDailyPerformanceEntity>> map = gateWayDailyPerformanceEntities.stream().collect(Collectors.groupingBy(x -> getMonth(x.getDate())));
+        Map<Integer, List<GateWayDailyPerformanceEntity>> map = gateWayDailyPerformanceEntities.stream().collect(Collectors.groupingBy(x -> DateUtils.getMonth(x.getDate())));
         // 计算月慢请求率平均值
         List<SlowRequestRateModel> slowRequestRateModels = new ArrayList<>();
         map.forEach((key, value) -> {
@@ -183,9 +184,15 @@ public class PerformanceRepository {
     }
 
     // 获取月份
-    public static int getMonth(Date date) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(date);
-        return calendar.get(Calendar.MONTH) + 1;
+
+
+    public List<GateWayDailyPerformanceEntity> getWeeklyMarketDataSituationtable(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null) {
+            List<GateWayDailyPerformanceEntity> apiDailyPerformanceEntities = gateWayDailyPerformanceMapper.getPerformanceByDate(startDate, endDate);
+            // apiDailyPerformanceEntities按照date排序
+            apiDailyPerformanceEntities.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));
+            return apiDailyPerformanceEntities;
+        }
+        return null;
     }
 }

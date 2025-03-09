@@ -11,6 +11,7 @@ import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.PerformanceUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.jungo.diy.controller.FileReadController.*;
+import static com.jungo.diy.util.DateUtils.YYYY_MM;
 
 /**
  * @author lichuang3
@@ -348,12 +350,7 @@ public class AnalysisService {
         // 计算月慢请求率平均值
         // 首先将performanceByYear的date字段按照"yyyy-MM"形式进行分组
         Map<String, List<GateWayDailyPerformanceEntity>> groupedByMonth = performanceByYear.stream()
-                .collect(Collectors.groupingBy(entity -> {
-                    LocalDate localDate = entity.getDate().toInstant()
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDate();
-                    return localDate.format(DateTimeFormatter.ofPattern("yyyy-MM"));
-                }));
+                .collect(Collectors.groupingBy(entity -> DateUtils.getDateString(entity.getDate(), YYYY_MM)));
 
         // 求取groupedByMonth value的平均值
         Map<String, Double> averageSlowRequestRateMap = new HashMap<>();

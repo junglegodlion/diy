@@ -28,4 +28,10 @@
         FROM gate_way_daily_performance
         WHERE host = #{host} and date >= #{startDate};
     </select>
+
+    <select id="getPerformanceByDate" resultMap="BaseResultMap">
+        SELECT *
+        FROM gate_way_daily_performance
+        WHERE host = 'cl-gateway.tuhu.cn' AND date BETWEEN #{startDate} AND #{endDate};
+    </select>
 </mapper>

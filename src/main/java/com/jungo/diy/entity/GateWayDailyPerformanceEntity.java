@@ -1,5 +1,7 @@
 package com.jungo.diy.entity;
 
+import com.jungo.diy.controller.FileReadController;
+import com.jungo.diy.util.DateUtils;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -57,7 +59,6 @@ public class GateWayDailyPerformanceEntity {
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate();
         // 使用ISO周规则计算周数
-        WeekFields weekFields = WeekFields.ISO;
-        return localDate.get(weekFields.weekOfWeekBasedYear());
+        return DateUtils.getWeekNumber(localDate);
     }
 }
