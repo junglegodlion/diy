@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
+import org.apache.xmlbeans.XmlException;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyles;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,15 +18,13 @@ import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.BufferedInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @author lichuang3
@@ -33,6 +33,26 @@ import java.util.Map;
 @Slf4j
 public class WordDocumentGenerator {
 
+    /**
+     * word整体样式
+     */
+    private static CTStyles wordStyles = null;
+
+    /**
+     * Word整体样式
+     */
+    static {
+        XWPFDocument template;
+        try {
+            // 读取模板文档
+            // 读取resources的文件
+            template = new XWPFDocument(Objects.requireNonNull(WordDocumentGenerator.class.getResourceAsStream("/format.docx")));
+            // 获得模板文档的整体样式
+            wordStyles = template.getStyle();
+        } catch (IOException | XmlException e) {
+            log.error("WordDocumentGenerator#static initializer,出现异常！", e);
+        }
+    }
     @Autowired
     private PerformanceRepository performanceRepository;
 
@@ -47,6 +67,11 @@ public class WordDocumentGenerator {
 
         // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
+            // 获取新建文档对象的样式
+            XWPFStyles newStyles = document.createStyles();
+            // 关键行// 修改设置文档样式为静态块中读取到的样式
+            // 参考：https://blog.csdn.net/hollycloud/article/details/120453185
+            newStyles.setStyles(wordStyles);
             // 一级标题
             setTitle(document, "慢请求率");
             // 表格是动态的，现在是几月，就要有几行
@@ -218,10 +243,11 @@ public class WordDocumentGenerator {
     }
 
     private static void setTitle(XWPFDocument document, String title) {
+
         // 创建段落
         XWPFParagraph titleParagraph = document.createParagraph();
         // 设置为“标题1”样式
-        titleParagraph.setStyle("Heading1");
+        titleParagraph.setStyle("2");
         // 设置段落居中对齐
         titleParagraph.setAlignment(ParagraphAlignment.CENTER);
         // 创建文本运行
