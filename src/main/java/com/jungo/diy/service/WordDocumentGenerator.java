@@ -20,6 +20,8 @@ import java.io.BufferedInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -98,7 +100,12 @@ public class WordDocumentGenerator {
         XWPFTableRow row = table.getRow(1);
         // 填充表格内容
         for (int i = 0; i < currentMonth; i++) {
-            row.getCell(i).setText(String.valueOf(gatewayAverageSlowRequestRate.get(i).getSlowRequestRate()));
+            double slowRequestRate = gatewayAverageSlowRequestRate.get(i).getSlowRequestRate();
+            // slowRequestRate转化是百分数，保留2位小数
+            DecimalFormat df = new DecimalFormat("0.00%");
+            // 可选：设置四舍五入模式（默认HALF_EVEN）
+            df.setRoundingMode(RoundingMode.HALF_UP);
+            row.getCell(i).setText(df.format(slowRequestRate));
         }
     }
 
