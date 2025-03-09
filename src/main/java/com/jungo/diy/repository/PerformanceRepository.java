@@ -8,6 +8,7 @@ import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
 import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.InterfacePerformanceModel;
+import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,10 +16,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -160,5 +158,34 @@ public class PerformanceRepository {
             urlPerformanceResponse.setReachTarget(!(p99ChangeRate > 0.1f) || p99Change <= 30);
         }
         return urlPerformanceResponse;
+    }
+
+    public List<SlowRequestRateModel> getGatewayAverageSlowRequestRate(int year) {
+        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = gateWayDailyPerformanceMapper.getPerformanceByYear("cl-gateway.tuhu.cn", LocalDate.of(year, 1, 1));
+        // 将gateWayDailyPerformanceEntities按照月份进行分组
+        Map<Integer, List<GateWayDailyPerformanceEntity>> map = gateWayDailyPerformanceEntities.stream().collect(Collectors.groupingBy(x -> getMonth(x.getDate())));
+        // 计算月慢请求率平均值
+        List<SlowRequestRateModel> slowRequestRateModels = new ArrayList<>();
+        map.forEach((key, value) -> {
+            double average = value.stream()
+                    .mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate)
+                    .average()
+                    .orElse(0.0);
+
+            SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
+            slowRequestRateModel.setMonth(key);
+            slowRequestRateModel.setSlowRequestRate(average);
+            slowRequestRateModels.add(slowRequestRateModel);
+        });
+        // slowRequestRateModels按照key排序
+        slowRequestRateModels.sort(Comparator.comparingInt(SlowRequestRateModel::getMonth));
+        return slowRequestRateModels;
+    }
+
+    // 获取月份
+    public static int getMonth(Date date) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(date);
+        return calendar.get(Calendar.MONTH) + 1;
     }
 }

@@ -14,4 +14,6 @@ public class SlowRequestRateModel {
     private Integer period;
     // 慢请求率
     private double slowRequestRate;
+    // 月份
+    private Integer month;
 }

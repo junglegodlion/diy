@@ -1,6 +1,7 @@
 package com.jungo.diy.service;
 
 import com.jungo.diy.enums.InterfaceTypeEnum;
+import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
@@ -37,12 +38,17 @@ public class WordDocumentGenerator {
                                      LocalDate startDate,
                                      LocalDate endDate) throws IOException, InvalidFormatException {
 
+        List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
         Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
         // 关键链路
         List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
 
         // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
+            // 一级标题
+            setTitle(document, "慢请求率");
+            // 表格是动态的，现在是几月，就要有几行
+            drawGatewayMonthlyAverageSlowRequestRateTable(document, gatewayAverageSlowRequestRate);
 
             // 核心接口监控接口
             setTitle(document, "核心接口监控接口");
@@ -58,6 +64,48 @@ public class WordDocumentGenerator {
         }
 
     }
+
+    private static void drawGatewayMonthlyAverageSlowRequestRateTable(XWPFDocument document, List<SlowRequestRateModel> gatewayAverageSlowRequestRate) {
+        // 获取当前月份
+        int currentMonth = LocalDate.now().getMonthValue();
+        // 插入表格前创建段落
+        XWPFParagraph tableParagraph = document.createParagraph();
+        tableParagraph.createRun().addBreak(); // 添加空行分隔
+
+        // 创建表格，行数为当前月份 + 1（表头行），列数为3
+        XWPFTable table = document.createTable(2, currentMonth);
+
+        // 设置表格宽度（占页面宽度的100%）
+        table.setWidth("100%");
+
+        // 设置表格边框（必须）
+        CTTblBorders borders = table.getCTTbl().addNewTblPr().addNewTblBorders();
+        borders.addNewBottom().setVal(STBorder.SINGLE);
+        borders.addNewLeft().setVal(STBorder.SINGLE);
+        borders.addNewRight().setVal(STBorder.SINGLE);
+        borders.addNewTop().setVal(STBorder.SINGLE);
+        borders.addNewInsideH().setVal(STBorder.SINGLE);
+        borders.addNewInsideV().setVal(STBorder.SINGLE);
+
+        // 设置表格表头
+        XWPFTableRow headerRow = table.getRow(0);
+        int year = LocalDate.now().getYear();
+        for (int i = 0; i < currentMonth; i++) {
+            String title = year + "-" + (i + 1);
+            headerRow.getCell(i).setText(title);
+        }
+
+        XWPFTableRow row = table.getRow(1);
+        // 填充表格内容
+        for (int i = 0; i < currentMonth; i++) {
+            row.getCell(i).setText(String.valueOf(gatewayAverageSlowRequestRate.get(i).getSlowRequestRate()));
+        }
+    }
+
+    public static void main(String[] args) {
+        System.out.println(LocalDate.now().getMonthValue());
+    }
+
 
     private static void setCriticalLinkTable(XWPFDocument document, List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses) {
         // 插入表格前创建段落
@@ -163,14 +211,20 @@ public class WordDocumentGenerator {
     }
 
     private static void setTitle(XWPFDocument document, String title) {
-        // ▼▼▼▼▼▼▼▼▼▼ 新增标题代码 ▼▼▼▼▼▼▼▼▼▼
+        // 创建段落
         XWPFParagraph titleParagraph = document.createParagraph();
+        // 设置为“标题1”样式
+        titleParagraph.setStyle("Heading1");
+        // 设置段落居中对齐
         titleParagraph.setAlignment(ParagraphAlignment.CENTER);
+        // 创建文本运行
         XWPFRun titleRun = titleParagraph.createRun();
         titleRun.setText(title);
+        // 加粗
         titleRun.setBold(true);
+        // 设置字体大小
         titleRun.setFontSize(22);
+        // 添加换行
         titleRun.addBreak(BreakType.TEXT_WRAPPING);
-        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     }
 }
