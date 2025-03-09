@@ -22,14 +22,11 @@ import org.springframework.stereotype.Service;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.math.RoundingMode;
-import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.jungo.diy.util.DateUtils.YYYY_MM;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
 /**
@@ -69,7 +66,14 @@ public class WordDocumentGenerator {
         // 月平均慢请求率
         List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
         // 获取周大盘数据数据情况
-        List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationtable(startDate, endDate);
+        List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationTable(startDate, endDate);
+        // weeklyMarketDataSituationData的平均值
+        double averageSlowRequestRateInThePastWeek = weeklyMarketDataSituationData.stream().mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate).average().orElse(0.0);
+
+        /*月慢请求率趋势数据*/
+        // endDate前30天
+        LocalDate startDateForMonthSlowRequestRateTrend = endDate.minusDays(30);
+        List<GateWayDailyPerformanceEntity> monthlySlowRequestRateTrendData = performanceRepository.getMonthlySlowRequestRateTrendData(startDateForMonthSlowRequestRateTrend, endDate);
 
         Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
         // 关键链路
@@ -88,6 +92,12 @@ public class WordDocumentGenerator {
             String endDateStr = DateUtils.getDateString(endDate, YYYY_MM_DD);
             setFirstLevelTitle(document, startDateStr + "~" + endDateStr + " 大盘数据数据情况");
             drawWeeklyMarketDataSituationTable(document, weeklyMarketDataSituationData);
+            setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(averageSlowRequestRateInThePastWeek));
+
+            /*月慢请求率趋势*/
+            setFirstLevelTitle(document, "2.1~3.6 慢请求率趋势");
+
+
 
             // 核心接口监控接口
             setFirstLevelTitle(document, "核心接口监控接口");
@@ -95,7 +105,6 @@ public class WordDocumentGenerator {
             // 获取关键路径的接口数据
             setCriticalLinkTable(document, criticalLinkUrlPerformanceResponses);
             setImage(document);
-            setTable(document);
             // 保存文档
             try (FileOutputStream out = new FileOutputStream(filePath)) {
                 document.write(out);
@@ -133,7 +142,7 @@ public class WordDocumentGenerator {
             row.getCell(5).setText(String.valueOf(gateWayDailyPerformanceEntity.getP50()));
             row.getCell(6).setText(String.valueOf(gateWayDailyPerformanceEntity.getTotalRequestCount()));
             row.getCell(7).setText(String.valueOf(gateWayDailyPerformanceEntity.getSlowRequestCount()));
-            row.getCell(8).setText(TableUtils.getPercentageFormatString(gateWayDailyPerformanceEntity.getSlowRequestRate()));
+            row.getCell(8).setText(TableUtils.getPercentageFormatDouble(gateWayDailyPerformanceEntity.getSlowRequestRate()));
         }
     }
 
@@ -163,30 +172,13 @@ public class WordDocumentGenerator {
         // 填充表格内容
         for (int i = 0; i < currentMonth; i++) {
             double slowRequestRate = gatewayAverageSlowRequestRate.get(i).getSlowRequestRate();
-            String format = TableUtils.getPercentageFormatString(slowRequestRate);
+            String format = TableUtils.getPercentageFormatDouble(slowRequestRate);
             row.getCell(i).setText(format);
         }
     }
 
     private static void setCriticalLinkTable(XWPFDocument document, List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses) {
-        // 插入表格前创建段落
-        XWPFParagraph tableParagraph = document.createParagraph();
-        tableParagraph.createRun().addBreak(); // 添加空行分隔
-
-        XWPFTable table = document.createTable(criticalLinkUrlPerformanceResponses.size() + 1, 3);
-
-        // 设置表格宽度（占页面宽度的100%）
-        table.setWidth("100%");
-
-        // 设置表格边框（必须）
-        CTTblBorders borders = table.getCTTbl().addNewTblPr().addNewTblBorders();
-        borders.addNewBottom().setVal(STBorder.SINGLE);
-        borders.addNewLeft().setVal(STBorder.SINGLE);
-        borders.addNewRight().setVal(STBorder.SINGLE);
-        borders.addNewTop().setVal(STBorder.SINGLE);
-        borders.addNewInsideH().setVal(STBorder.SINGLE);
-        borders.addNewInsideV().setVal(STBorder.SINGLE);
-
+        XWPFTable table = TableUtils.createXwpfTable(document, criticalLinkUrlPerformanceResponses.size() + 1, 9);
         // 设置表格表头
         XWPFTableRow headerRow = table.getRow(0);
         XWPFTableCell pageNameCell = headerRow.getCell(0);
@@ -199,38 +191,6 @@ public class WordDocumentGenerator {
             UrlPerformanceResponse urlPerformanceResponse = criticalLinkUrlPerformanceResponses.get(i);
             XWPFTableCell cell = row.getCell(0);
             cell.setText(urlPerformanceResponse.getPageName());
-        }
-    }
-
-    private static void setTable(XWPFDocument document) {
-        // 插入表格前创建段落
-        XWPFParagraph tableParagraph = document.createParagraph();
-        tableParagraph.createRun().addBreak(); // 添加空行分隔
-
-        XWPFTable table = document.createTable(3, 3);
-
-        // 设置表格宽度（占页面宽度的100%）
-        table.setWidth("100%");
-
-        // 设置表格边框（必须）
-        CTTblBorders borders = table.getCTTbl().addNewTblPr().addNewTblBorders();
-        borders.addNewBottom().setVal(STBorder.SINGLE);
-        borders.addNewLeft().setVal(STBorder.SINGLE);
-        borders.addNewRight().setVal(STBorder.SINGLE);
-        borders.addNewTop().setVal(STBorder.SINGLE);
-        borders.addNewInsideH().setVal(STBorder.SINGLE);
-        borders.addNewInsideV().setVal(STBorder.SINGLE);
-
-        // 填充单元格内容
-        for (int i = 0; i < 3; i++) {
-            XWPFTableRow row = table.getRow(i);
-            for (int j = 0; j < 3; j++) {
-                XWPFTableCell cell = row.getCell(j);
-                cell.setText("Cell " + (i + 1) + "-" + (j + 1));
-
-                // 设置单元格垂直居中
-                cell.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
-            }
         }
     }
 

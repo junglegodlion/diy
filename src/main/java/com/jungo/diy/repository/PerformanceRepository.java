@@ -186,7 +186,17 @@ public class PerformanceRepository {
     // 获取月份
 
 
-    public List<GateWayDailyPerformanceEntity> getWeeklyMarketDataSituationtable(LocalDate startDate, LocalDate endDate) {
+    public List<GateWayDailyPerformanceEntity> getWeeklyMarketDataSituationTable(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null) {
+            List<GateWayDailyPerformanceEntity> apiDailyPerformanceEntities = gateWayDailyPerformanceMapper.getPerformanceByDate(startDate, endDate);
+            // apiDailyPerformanceEntities按照date排序
+            apiDailyPerformanceEntities.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));
+            return apiDailyPerformanceEntities;
+        }
+        return null;
+    }
+
+    public List<GateWayDailyPerformanceEntity> getMonthlySlowRequestRateTrendData(LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null) {
             List<GateWayDailyPerformanceEntity> apiDailyPerformanceEntities = gateWayDailyPerformanceMapper.getPerformanceByDate(startDate, endDate);
             // apiDailyPerformanceEntities按照date排序

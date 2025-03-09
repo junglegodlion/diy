@@ -21,7 +21,7 @@ public class TableUtils {
 
     private TableUtils() {}
 
-    public static String getPercentageFormatString(double slowRequestRate) {
+    public static String getPercentageFormatDouble(double slowRequestRate) {
         // slowRequestRate转化是百分数，保留2位小数
         DecimalFormat df = new DecimalFormat("0.00%");
         // 可选：设置四舍五入模式（默认HALF_EVEN）
