@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
@@ -96,12 +97,32 @@ public class WordDocumentGenerator {
 
             /*月慢请求率趋势*/
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
+            // jungo TODO 2025/3/10:补充图片
 
 
+            /*月99线趋势*/
+            setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 99线趋势");
+            // jungo TODO 2025/3/10:补充图片
 
-            // 核心接口监控接口
+            /*2025年周维度99线趋势*/
+            int year = LocalDate.now().getYear();
+            setFirstLevelTitle(document, year + "年周维度99线趋势");
+            // jungo TODO 2025/3/10:补充图片
+
+            /* 2025年周维度慢请求率趋势*/
+            setFirstLevelTitle(document, year + "年周维度慢请求率趋势");
+            // jungo TODO 2025/3/10:补充图片
+
+            /*核心接口监控接口*/
             setFirstLevelTitle(document, "核心接口监控接口");
-            setText(document, "一、关键路径");
+            setSecondLevelTitle(document, "一、关键路径");
+            drawCriticalPathTable(document, criticalLinkUrlPerformanceResponses, startDate, endDate);
+            setSecondLevelTitle(document, "二、五大金刚");
+            setSecondLevelTitle(document, "三、首屏TAB");
+            setSecondLevelTitle(document, "四、活动页关键组件（麒麟组件接口）");
+            setSecondLevelTitle(document, "五、其他核心业务接口");
+            setSecondLevelTitle(document, "六、请求量TOP接口");
+
             // 获取关键路径的接口数据
             setCriticalLinkTable(document, criticalLinkUrlPerformanceResponses);
             setImage(document);
@@ -113,39 +134,75 @@ public class WordDocumentGenerator {
 
     }
 
-    private void drawWeeklyMarketDataSituationTable(XWPFDocument document, List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData) {
+    private void drawCriticalPathTable(XWPFDocument document,
+                                       List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses,
+                                       LocalDate startDate,
+                                       LocalDate endDate) {
+        String startDateString = DateUtils.getDateString(startDate, YYYY_MM_DD);
+        String endDateString = DateUtils.getDateString(endDate, YYYY_MM_DD);
+        String[] headers = {"页面名称",
+                "接口",
+                startDateString + "日99线",
+                endDateString + "日99线",
+                startDateString + "日调用量",
+                endDateString + "日调用量",
+                startDateString + "慢请求(300ms)率",
+                endDateString + "慢请求(300ms)率",
+                "接口性能变化（ms）",
+                "99线环比"};
 
-        int rows = weeklyMarketDataSituationData.size();
-        XWPFTable table = TableUtils.createXwpfTable(document, rows + 1, 9);
+        drawTable(document, criticalLinkUrlPerformanceResponses, headers, (row, entity) -> {
+            row.getCell(0).setText(entity.getPageName());
+            row.getCell(1).setText(entity.getUrl());
+            row.getCell(2).setText(String.valueOf(entity.getLastWeekP99()));
+            row.getCell(3).setText(String.valueOf(entity.getThisWeekP99()));
+            row.getCell(4).setText(String.valueOf(entity.getLastWeekTotalRequestCount()));
+            row.getCell(5).setText(String.valueOf(entity.getThisWeekTotalRequestCount()));
+            row.getCell(6).setText(TableUtils.getPercentageFormatDouble(entity.getLastWeekSlowRequestRate()));
+            row.getCell(7).setText(TableUtils.getPercentageFormatDouble(entity.getThisWeekSlowRequestRate()));
+            row.getCell(8).setText(String.valueOf(entity.getP99Change()));
+            row.getCell(9).setText(TableUtils.getPercentageFormatDouble(entity.getP99ChangeRate()));
+        });
+    }
 
-        /*设置表格表头*/
+
+    // 新增通用表格生成方法
+    private <T> void drawTable(XWPFDocument document,
+                               List<T> data,
+                               String[] headers,
+                               BiConsumer<XWPFTableRow, T> rowDataSetter) {
+        int rows = data.size();
+        int cols = headers.length;
+        XWPFTable table = TableUtils.createXwpfTable(document, rows + 1, cols);
+
+        // 设置表头
         XWPFTableRow headerRow = table.getRow(0);
-        headerRow.getCell(0).setText("日期");
-        headerRow.getCell(1).setText("999线");
-        headerRow.getCell(2).setText("99线");
-        headerRow.getCell(3).setText("90线");
-        headerRow.getCell(4).setText("75线");
-        headerRow.getCell(5).setText("50线");
-        headerRow.getCell(6).setText("总请求数");
-        headerRow.getCell(7).setText("慢请求数");
-        headerRow.getCell(8).setText("慢请求率");
+        for (int i = 0; i < cols; i++) {
+            headerRow.getCell(i).setText(headers[i]);
+        }
 
         // 填充表格内容
         for (int i = 0; i < rows; i++) {
             XWPFTableRow row = table.getRow(i + 1);
-            GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = weeklyMarketDataSituationData.get(i);
-            row.getCell(0).setText(DateUtils.getDateString(gateWayDailyPerformanceEntity.getDate(), YYYY_MM_DD));
-            row.getCell(1).setText(String.valueOf(gateWayDailyPerformanceEntity.getP999()));
-            row.getCell(2).setText(String.valueOf(gateWayDailyPerformanceEntity.getP99()));
-            row.getCell(3).setText(String.valueOf(gateWayDailyPerformanceEntity.getP90()));
-            row.getCell(4).setText(String.valueOf(gateWayDailyPerformanceEntity.getP75()));
-            row.getCell(5).setText(String.valueOf(gateWayDailyPerformanceEntity.getP50()));
-            row.getCell(6).setText(String.valueOf(gateWayDailyPerformanceEntity.getTotalRequestCount()));
-            row.getCell(7).setText(String.valueOf(gateWayDailyPerformanceEntity.getSlowRequestCount()));
-            row.getCell(8).setText(TableUtils.getPercentageFormatDouble(gateWayDailyPerformanceEntity.getSlowRequestRate()));
+            rowDataSetter.accept(row, data.get(i));
         }
     }
 
+    private void drawWeeklyMarketDataSituationTable(XWPFDocument document, List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData) {
+        String[] headers = {"日期", "999线", "99线", "90线", "75线", "50线", "总请求数", "慢请求数", "慢请求率"};
+
+        drawTable(document, weeklyMarketDataSituationData, headers, (row, entity) -> {
+            row.getCell(0).setText(DateUtils.getDateString(entity.getDate(), YYYY_MM_DD));
+            row.getCell(1).setText(String.valueOf(entity.getP999()));
+            row.getCell(2).setText(String.valueOf(entity.getP99()));
+            row.getCell(3).setText(String.valueOf(entity.getP90()));
+            row.getCell(4).setText(String.valueOf(entity.getP75()));
+            row.getCell(5).setText(String.valueOf(entity.getP50()));
+            row.getCell(6).setText(String.valueOf(entity.getTotalRequestCount()));
+            row.getCell(7).setText(String.valueOf(entity.getSlowRequestCount()));
+            row.getCell(8).setText(TableUtils.getPercentageFormatDouble(entity.getSlowRequestRate()));
+        });
+    }
 
 
     private static void setWordStyle(XWPFDocument document) {
@@ -231,11 +288,11 @@ public class WordDocumentGenerator {
         run.setText(text);
     }
 
-    private static void setFirstLevelTitle(XWPFDocument document, String title) {
+    private static void setTitle(XWPFDocument document, String title, String style, int fontSize) {
         // 创建段落
         XWPFParagraph titleParagraph = document.createParagraph();
-        // 设置为“标题1”样式
-        titleParagraph.setStyle("2");
+        // 设置指定样式
+        titleParagraph.setStyle(style);
         // 设置段落居中对齐
         titleParagraph.setAlignment(ParagraphAlignment.CENTER);
         // 创建文本运行
@@ -244,8 +301,17 @@ public class WordDocumentGenerator {
         // 加粗
         titleRun.setBold(true);
         // 设置字体大小
-        titleRun.setFontSize(22);
+        titleRun.setFontSize(fontSize);
         // 添加换行
         titleRun.addBreak(BreakType.TEXT_WRAPPING);
     }
+
+    private static void setFirstLevelTitle(XWPFDocument document, String title) {
+        setTitle(document, title, "2", 22);
+    }
+
+    private void setSecondLevelTitle(XWPFDocument document, String title) {
+        setTitle(document, title, "3", 22);
+    }
+
 }

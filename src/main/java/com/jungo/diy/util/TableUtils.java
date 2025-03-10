@@ -1,3 +1,4 @@
+
 package com.jungo.diy.util;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -31,6 +32,12 @@ public class TableUtils {
 
     private TableUtils() {}
 
+    /**
+     * 将给定的慢请求速率转换为百分比格式的字符串，保留两位小数。
+     *
+     * @param slowRequestRate 慢请求速率（小数形式）
+     * @return 格式化后的百分比字符串
+     */
     public static String getPercentageFormatDouble(double slowRequestRate) {
         // slowRequestRate转化是百分数，保留2位小数
         DecimalFormat df = new DecimalFormat("0.00%");
@@ -39,6 +46,15 @@ public class TableUtils {
         return df.format(slowRequestRate);
     }
 
+    /**
+     * 在给定的 XWPFDocument 文档中创建一个带有指定行数和列数的 XWPFTable 表格。
+     * 表格宽度占页面宽度的 100%，并且带有单线边框。
+     *
+     * @param document XWPFDocument 文档对象
+     * @param rows 表格的行数
+     * @param cols 表格的列数
+     * @return 创建的 XWPFTable 表格对象
+     */
     public static XWPFTable createXwpfTable(XWPFDocument document, int rows, int cols) {
         // 插入表格前创建段落
         XWPFParagraph tableParagraph = document.createParagraph();
@@ -58,6 +74,14 @@ public class TableUtils {
         return table;
     }
 
+    /**
+     * 将给定的字符串转换为整数。
+     * 如果字符串包含小数部分，则抛出 IllegalArgumentException。
+     *
+     * @param input 待转换的字符串
+     * @return 转换后的整数
+     * @throws IllegalArgumentException 如果输入包含非整数部分或无效的数字格式
+     */
     public static Integer convertStringToInteger(String input) {
         input = input.trim();
         try {
@@ -75,6 +99,20 @@ public class TableUtils {
         }
     }
 
+    /**
+     * 在给定的 XSSFWorkbook 工作簿中创建一个名为 sheetName 的工作表，
+     * 并使用提供的数据和图表配置填充该工作表。
+     *
+     * @param workbook XSSFWorkbook 工作簿对象
+     * @param sheetName 工作表名称
+     * @param models 数据模型列表
+     * @param columnTitles 列标题数组
+     * @param titleText 图表标题文本
+     * @param xTitle X 轴标题文本
+     * @param yTitle Y 轴标题文本
+     * @param seriesTitle 数据系列标题文本
+     * @param extractor 用于提取数据的 Extractor 接口实现
+     */
     public static <P> void createModelSheet(XSSFWorkbook workbook,
                                             String sheetName,
                                             List<P> models,
@@ -94,6 +132,13 @@ public class TableUtils {
         configurePerformanceLineChartData(chart, sheet, xTitle, yTitle, seriesTitle);
     }
 
+    /**
+     * 返回一个用于格式化百分比的 CellStyle 对象。
+     * 百分比格式保留两位小数。
+     *
+     * @param workbook XSSFWorkbook 工作簿对象
+     * @return 格式化的 CellStyle 对象
+     */
     public static CellStyle getPercentageCellStyle(XSSFWorkbook workbook) {
         DataFormat dataFormat = workbook.createDataFormat();
         short percentageFormat = dataFormat.getFormat("0.00%");
@@ -102,6 +147,17 @@ public class TableUtils {
         return percentageCellStyle;
     }
 
+    /**
+     * 配置给定的 XSSFChart 对象的性能折线图数据。
+     * 图表将使用提供的 X 轴标题、Y 轴标题和数据系列标题。
+     * Y 轴将被隐藏，并且数据标签仅显示 Y 轴数值。
+     *
+     * @param chart XSSFChart 图表对象
+     * @param sheet XSSFSheet 工作表对象
+     * @param xTitle X 轴标题文本
+     * @param yTitle Y 轴标题文本
+     * @param seriesTitle 数据系列标题文本
+     */
     public static void configurePerformanceLineChartData(XSSFChart chart,
                                                          XSSFSheet sheet,
                                                          String xTitle,
@@ -163,7 +219,14 @@ public class TableUtils {
         chart.plot(data);
     }
 
-
+    /**
+     * 在给定的 XSSFSheet 工作表中创建一个 XSSFChart 图表对象。
+     * 图表的位置和大小由 XSSFClientAnchor 对象指定。
+     *
+     * @param titleText 图表标题文本
+     * @param sheet XSSFSheet 工作表对象
+     * @return 创建的 XSSFChart 图表对象
+     */
     private static XSSFChart createXssfChart(String titleText, XSSFSheet sheet) {
         XSSFDrawing drawing = sheet.createDrawingPatriarch();
         XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
@@ -177,7 +240,16 @@ public class TableUtils {
         return chart;
     }
 
-
+    /**
+     * 在给定的 XSSFSheet 工作表中创建图表数据。
+     * 使用提供的数据模型列表、列标题数组和 Extractor 接口实现来填充数据。
+     *
+     * @param workbook XSSFWorkbook 工作簿对象
+     * @param sheet XSSFSheet 工作表对象
+     * @param models 数据模型列表
+     * @param columnTitles 列标题数组
+     * @param extractor 用于提取数据的 Extractor 接口实现
+     */
     public static <P> void createChartData(XSSFWorkbook workbook, XSSFSheet sheet, List<P> models, String[] columnTitles, Extractor<P> extractor) {
         Row headerRow = sheet.createRow(0);
         for (int i = 0; i < columnTitles.length; i++) {
