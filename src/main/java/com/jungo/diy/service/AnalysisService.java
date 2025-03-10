@@ -13,6 +13,7 @@ import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.PerformanceUtils;
+import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -487,7 +488,7 @@ public class AnalysisService {
         chart.setTitleText("gateway 99线");
         chart.setTitleOverlay(false);
         // 5. 配置图表数据
-        configurePerformanceLineChartData(chart, sheet, "日期",  "99线", "99线");
+        TableUtils.configurePerformanceLineChartData(chart, sheet, "日期",  "99线", "99线");
     }
 
     public String batchGetSlowRequestRateCurve(String[] urls,
@@ -539,7 +540,7 @@ public class AnalysisService {
         chart.setTitleOverlay(false);
         // 5. 配置图表数据
         // 性能折线图
-        configurePerformanceLineChartData(chart, sheet, "日期",  "慢请求率", "慢请求率");
+        TableUtils.configurePerformanceLineChartData(chart, sheet, "日期",  "慢请求率", "慢请求率");
     }
 
     private List<SlowRequestRateModel> getSlowRequestRateModelsNew(List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities) {

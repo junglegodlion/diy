@@ -304,28 +304,19 @@ public class FileReadController {
                                                  String yTitle,
                                                  String seriesTitle) {
         String[] columnTitles = {"日期", "慢请求率"};
-        createModelSheet(workbook, sheetName, slowRequestRateModels, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
+        TableUtils.createModelSheet(workbook, sheetName, slowRequestRateModels, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
             switch (columnIndex) {
                 case 0:
                     cell.setCellValue(model.getDate());
                     break;
                 case 1:
                     cell.setCellValue(model.getSlowRequestRate());
-                    cell.setCellStyle(getPercentageCellStyle(workbook));
+                    cell.setCellStyle(TableUtils.getPercentageCellStyle(workbook));
                     break;
             }
         });
 
     }
-
-    private static CellStyle getPercentageCellStyle(XSSFWorkbook workbook) {
-        DataFormat dataFormat = workbook.createDataFormat();
-        short percentageFormat = dataFormat.getFormat("0.00%");
-        CellStyle percentageCellStyle = workbook.createCellStyle();
-        percentageCellStyle.setDataFormat(percentageFormat);
-        return percentageCellStyle;
-    }
-
     public static void createP99ModelSheet(XSSFWorkbook workbook,
                                      String sheetName,
                                      List<P99Model> p99Models,
@@ -334,7 +325,7 @@ public class FileReadController {
                                      String yTitle,
                                      String seriesTitle) {
         String[] columnTitles = {"日期", "99线"};
-        createModelSheet(workbook, sheetName, p99Models, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
+        TableUtils.createModelSheet(workbook, sheetName, p99Models, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
             switch (columnIndex) {
                 case 0:
                     cell.setCellValue(model.getDate());
@@ -344,124 +335,6 @@ public class FileReadController {
                     break;
             }
         });
-    }
-
-    public static <P> void createModelSheet(XSSFWorkbook workbook,
-                                            String sheetName,
-                                            List<P> models,
-                                            String[] columnTitles,
-                                            String titleText,
-                                            String xTitle,
-                                            String yTitle,
-                                            String seriesTitle,
-                                            Extractor<P> extractor) {
-        // 创建工作表
-        XSSFSheet sheet = workbook.createSheet(sheetName);
-        // 写入数据
-        createChartData(workbook, sheet, models, columnTitles, extractor);
-        // 创建绘图对象
-        XSSFChart chart = createXssfChart(titleText, sheet);
-        // 配置图表数据
-        configurePerformanceLineChartData(chart, sheet, xTitle, yTitle, seriesTitle);
-    }
-
-    public static <P> void createChartData(XSSFWorkbook workbook, XSSFSheet sheet, List<P> models, String[] columnTitles, Extractor<P> extractor) {
-        Row headerRow = sheet.createRow(0);
-        for (int i = 0; i < columnTitles.length; i++) {
-            headerRow.createCell(i).setCellValue(columnTitles[i]);
-        }
-
-        // 创建数据行
-        for (int i = 0; i < models.size(); i++) {
-            Row row = sheet.createRow(i + 1);
-            for (int j = 0; j < columnTitles.length; j++) {
-                Cell cell = row.createCell(j);
-                extractor.extract(models.get(i), j, cell);
-            }
-        }
-    }
-
-    // 定义一个提取器接口
-    @FunctionalInterface
-    public interface Extractor<P> {
-        void extract(P model, int columnIndex, Cell cell);
-    }
-
-
-
-
-    private static XSSFChart createXssfChart(String titleText, XSSFSheet sheet) {
-        XSSFDrawing drawing = sheet.createDrawingPatriarch();
-        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
-        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
-        int endCol = anchor.getCol1() + chartWidthCols;
-        anchor.setCol2(anchor.getCol1() + endCol);
-        // 4. 创建图表对象
-        XSSFChart chart = drawing.createChart(anchor);
-        chart.setTitleText(titleText);
-        chart.setTitleOverlay(false);
-        return chart;
-    }
-
-    public static void configurePerformanceLineChartData(XSSFChart chart,
-                                                         XSSFSheet sheet,
-                                                         String xTitle,
-                                                         String yTitle,
-                                                         String seriesTitle) {
-        // 1. 创建数据源引用
-        int lastRowNum = sheet.getLastRowNum();
-        CellRangeAddress categoryRange = new CellRangeAddress(1, lastRowNum, 0, 0);
-        CellRangeAddress valueRange = new CellRangeAddress(1, lastRowNum, 1, 1);
-
-        // 2. 创建数据源
-        XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
-                sheet,
-                categoryRange
-        );
-        XDDFNumericalDataSource<Double> values = XDDFDataSourcesFactory.fromNumericCellRange(
-                sheet,
-                valueRange
-        );
-
-        // 3. 创建图表数据
-        XDDFValueAxis yAxis = getValueAxis(chart, yTitle);
-        // 新增：隐藏Y轴主体
-        yAxis.setVisible(false);
-        XDDFChartData data = chart.createData(
-                ChartTypes.LINE,
-                getChartAxis(chart, xTitle),
-                yAxis
-        );
-
-        // 4. 添加数据系列
-        XDDFChartData.Series series = data.addSeries(categories, values);
-        series.setTitle(seriesTitle, null);
-        setLineStyle(series, PresetColor.YELLOW);
-
-        // XDDFChartLegend legend = chart.getOrAddLegend();
-        // legend.setPosition(LegendPosition.TOP_RIGHT);
-
-        // POI 5.2.3 及以上，启用数据标签的正确方式
-        // **仅显示数据点的 Y 轴数值（不显示类别名、序列名等）**
-        CTDLbls dLbls = chart.getCTChart().getPlotArea().getLineChartArray(0).getSerArray(0).addNewDLbls();
-        // 仅显示数值
-        dLbls.addNewShowVal().setVal(true);
-        // 不显示图例键
-        dLbls.addNewShowLegendKey().setVal(false);
-        // 不显示类别名称
-        dLbls.addNewShowCatName().setVal(false);
-        dLbls.addNewShowSerName().setVal(false);
-        // 标签位置设置为顶部
-        // 尝试设置标签位置为顶部
-        try {
-            dLbls.addNewDLblPos().setVal(STDLblPos.T);
-        } catch (Exception e) {
-            // 处理异常，可能是由于模式文件缺失或其他原因
-            System.err.println("Failed to set data label position: " + e.getMessage());
-        }
-
-        // 5. 绘制图表
-        chart.plot(data);
     }
 
     public static void createP99ModelsData(XSSFSheet sheet, List<P99Model> p99Models) {
