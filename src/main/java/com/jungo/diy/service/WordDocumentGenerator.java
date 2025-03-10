@@ -95,7 +95,7 @@ public class WordDocumentGenerator {
             setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(averageSlowRequestRateInThePastWeek));
 
             /*月慢请求率趋势*/
-            setFirstLevelTitle(document, "2.1~3.6 慢请求率趋势");
+            setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
 
 
 
