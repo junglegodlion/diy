@@ -2,6 +2,7 @@ package com.jungo.diy.controller;
 
 import com.jungo.diy.model.*;
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.service.AnalysisService;
 import com.jungo.diy.service.ExportService;
 import com.jungo.diy.service.FileService;
 import com.jungo.diy.util.DateUtils;
@@ -54,6 +55,9 @@ public class FileReadController {
 
     @Autowired
     private ExportService exportService;
+
+    @Autowired
+    private AnalysisService analysisService;
 
     @PostMapping("/upload/getPerformance")
     public void readFile(@RequestParam("file") MultipartFile file, HttpServletResponse response) throws IOException {
@@ -269,10 +273,10 @@ public class FileReadController {
             // 定义 Sheet 名称和数据列表
             String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率"};
 
-            createP99ModelSheet(workbook, sheetNames[0], p99Models, "gateway 99线", "日期", "99线", "99线");
-            createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
-            createSlowRequestRateModelSheet(workbook, sheetNames[2], slowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
-            createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
+            analysisService.createP99ModelSheet(workbook, sheetNames[0], p99Models, "gateway 99线", "日期", "99线", "99线");
+            analysisService.createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
+            analysisService.createSlowRequestRateModelSheet(workbook, sheetNames[2], slowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
+            analysisService.createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
 
             // 拼接完整的文件路径
             // 获取当天日期并格式化为 yyyy-MM-dd 格式
@@ -294,47 +298,6 @@ public class FileReadController {
         } catch (Exception e) {
             log.error("FileReadController#getCharts,出现异常！", e);
         }
-    }
-
-    public static void createSlowRequestRateModelSheet(XSSFWorkbook workbook,
-                                                 String sheetName,
-                                                 List<SlowRequestRateModel> slowRequestRateModels,
-                                                 String titleText,
-                                                 String xTitle,
-                                                 String yTitle,
-                                                 String seriesTitle) {
-        String[] columnTitles = {"日期", "慢请求率"};
-        TableUtils.createModelSheet(workbook, sheetName, slowRequestRateModels, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
-            switch (columnIndex) {
-                case 0:
-                    cell.setCellValue(model.getDate());
-                    break;
-                case 1:
-                    cell.setCellValue(model.getSlowRequestRate());
-                    cell.setCellStyle(TableUtils.getPercentageCellStyle(workbook));
-                    break;
-            }
-        });
-
-    }
-    public static void createP99ModelSheet(XSSFWorkbook workbook,
-                                     String sheetName,
-                                     List<P99Model> p99Models,
-                                     String titleText,
-                                     String xTitle,
-                                     String yTitle,
-                                     String seriesTitle) {
-        String[] columnTitles = {"日期", "99线"};
-        TableUtils.createModelSheet(workbook, sheetName, p99Models, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
-            switch (columnIndex) {
-                case 0:
-                    cell.setCellValue(model.getDate());
-                    break;
-                case 1:
-                    cell.setCellValue(model.getP99());
-                    break;
-            }
-        });
     }
 
     public static void createP99ModelsData(XSSFSheet sheet, List<P99Model> p99Models) {

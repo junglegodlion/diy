@@ -17,7 +17,6 @@ import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +36,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.jungo.diy.controller.FileReadController.*;
 import static com.jungo.diy.util.DateUtils.YYYY_MM;
 
 /**
@@ -233,28 +231,7 @@ public class AnalysisService {
         /* 配置HTTP响应头为Excel文件格式，并指定下载文件名 */
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment;filename=performance_chart.xlsx");
-        /* 获取指定年份网关性能数据并排序 */
-        LocalDate date = LocalDate.of(year, 1, 1);
-        String host = "cl-gateway.tuhu.cn";
-        List<GateWayDailyPerformanceEntity> performanceByYear = gateWayDailyPerformanceMapper.getPerformanceByYear(host, date);
-        // performanceByYear按照date排序
-        performanceByYear.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));
-
-        /* 获取指定年份网关性能数据并排序 */
-        // 获取该年的99线
-        List<P99Model> yearP99Models = getNewP99Models(performanceByYear);
-        // 获取该月99线
-        List<P99Model> monthP99Models = getMonthP99Models(performanceByYear, startDate);
-        // 获取该年周维度平均99线
-        List<P99Model> averageP99Models = PerformanceUtils.getAverageP99Models(yearP99Models);
-
-        /* 计算不同时间维度的慢请求率 */
-        // 获取该月慢请求率
-        List<SlowRequestRateModel> monthSlowRequestRateModels = getMonthSlowRequestRateModels(performanceByYear, startDate);
-        // 慢请求率
-        List<SlowRequestRateModel> yearSlowRequestRateModels = getSlowRequestRateModels(performanceByYear);
-        // 周维度慢请求率
-        List<SlowRequestRateModel> averageSlowRequestRateModels = PerformanceUtils.getAverageSlowRequestRateModels(yearSlowRequestRateModels);
+        TableData result = getTableData(year, startDate);
 
         /* 创建Excel工作簿并生成多个数据表 */
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
@@ -262,11 +239,11 @@ public class AnalysisService {
             String[] sheetNames = {"99线", "周维度99线", "慢请求率", "周维度慢请求率", "平均慢请求率"};
 
             /* 生成包含不同指标的工作表 */
-            createP99ModelSheet(workbook, sheetNames[0], monthP99Models, "gateway 99线", "日期", "99线", "99线");
-            createP99ModelSheet(workbook, sheetNames[1], averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
-            createSlowRequestRateModelSheet(workbook, sheetNames[2], monthSlowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
-            createSlowRequestRateModelSheet(workbook, sheetNames[3], averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
-            createAverageRowsModelSheet(workbook, sheetNames[4], performanceByYear);
+            createP99ModelSheet(workbook, sheetNames[0], result.monthP99Models, "gateway 99线", "日期", "99线", "99线");
+            createP99ModelSheet(workbook, sheetNames[1], result.averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
+            createSlowRequestRateModelSheet(workbook, sheetNames[2], result.monthSlowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
+            createSlowRequestRateModelSheet(workbook, sheetNames[3], result.averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
+            createAverageRowsModelSheet(workbook, sheetNames[4], result.performanceByYear);
 
             /* 生成文件路径并保存到本地 */
             LocalDate currentDate = LocalDate.now();
@@ -289,6 +266,94 @@ public class AnalysisService {
             log.error("FileReadController#getCharts,出现异常！", e);
         }
 
+    }
+
+    private TableData getTableData(Integer year, LocalDate startDate) {
+        /* 获取指定年份网关性能数据并排序 */
+        LocalDate date = LocalDate.of(year, 1, 1);
+        String host = "cl-gateway.tuhu.cn";
+        List<GateWayDailyPerformanceEntity> performanceByYear = gateWayDailyPerformanceMapper.getPerformanceByYear(host, date);
+        // performanceByYear按照date排序
+        performanceByYear.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));
+
+        /* 获取指定年份网关性能数据并排序 */
+        // 获取该年的99线
+        List<P99Model> yearP99Models = getNewP99Models(performanceByYear);
+        // 获取该月99线
+        List<P99Model> monthP99Models = getMonthP99Models(performanceByYear, startDate);
+        // 获取该年周维度平均99线
+        List<P99Model> averageP99Models = PerformanceUtils.getAverageP99Models(yearP99Models);
+
+        /* 计算不同时间维度的慢请求率 */
+        // 获取该月慢请求率
+        List<SlowRequestRateModel> monthSlowRequestRateModels = getMonthSlowRequestRateModels(performanceByYear, startDate);
+        // 慢请求率
+        List<SlowRequestRateModel> yearSlowRequestRateModels = getSlowRequestRateModels(performanceByYear);
+        // 周维度慢请求率
+        List<SlowRequestRateModel> averageSlowRequestRateModels = PerformanceUtils.getAverageSlowRequestRateModels(yearSlowRequestRateModels);
+        return new TableData(performanceByYear, monthP99Models, averageP99Models, monthSlowRequestRateModels, averageSlowRequestRateModels);
+    }
+
+    private static class TableData {
+        public final List<GateWayDailyPerformanceEntity> performanceByYear;
+        public final List<P99Model> monthP99Models;
+        public final List<P99Model> averageP99Models;
+        public final List<SlowRequestRateModel> monthSlowRequestRateModels;
+        public final List<SlowRequestRateModel> averageSlowRequestRateModels;
+
+        public TableData(List<GateWayDailyPerformanceEntity> performanceByYear,
+                         List<P99Model> monthP99Models,
+                         List<P99Model> averageP99Models,
+                         List<SlowRequestRateModel> monthSlowRequestRateModels,
+                         List<SlowRequestRateModel> averageSlowRequestRateModels) {
+            this.performanceByYear = performanceByYear;
+            this.monthP99Models = monthP99Models;
+            this.averageP99Models = averageP99Models;
+            this.monthSlowRequestRateModels = monthSlowRequestRateModels;
+            this.averageSlowRequestRateModels = averageSlowRequestRateModels;
+        }
+    }
+
+    public static void createSlowRequestRateModelSheet(XSSFWorkbook workbook,
+                                                       String sheetName,
+                                                       List<SlowRequestRateModel> slowRequestRateModels,
+                                                       String titleText,
+                                                       String xTitle,
+                                                       String yTitle,
+                                                       String seriesTitle) {
+        String[] columnTitles = {"日期", "慢请求率"};
+        TableUtils.createModelSheet(workbook, sheetName, slowRequestRateModels, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
+            switch (columnIndex) {
+                case 0:
+                    cell.setCellValue(model.getDate());
+                    break;
+                case 1:
+                    cell.setCellValue(model.getSlowRequestRate());
+                    cell.setCellStyle(TableUtils.getPercentageCellStyle(workbook));
+                    break;
+            }
+        });
+
+    }
+
+    public static void createP99ModelSheet(XSSFWorkbook workbook,
+                                           String sheetName,
+                                           List<P99Model> p99Models,
+                                           String titleText,
+                                           String xTitle,
+                                           String yTitle,
+                                           String seriesTitle) {
+        String[] columnTitles = {"日期", "99线"};
+        TableUtils.createModelSheet(workbook, sheetName, p99Models, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
+            switch (columnIndex) {
+                case 0:
+                    cell.setCellValue(model.getDate());
+                    break;
+                case 1:
+                    cell.setCellValue(model.getP99());
+                    break;
+            }
+        });
     }
 
     private void createAverageRowsModelSheet(XSSFWorkbook workbook,
@@ -319,11 +384,7 @@ public class AnalysisService {
 
 
         // 创建百分比格式
-        DataFormat dataFormat = workbook.createDataFormat();
-        short percentageFormat = dataFormat.getFormat("0.00%");
-        CellStyle percentageCellStyle = workbook.createCellStyle();
-        percentageCellStyle.setDataFormat(percentageFormat);
-
+        CellStyle percentageCellStyle = TableUtils.getPercentageCellStyle(workbook);
         for (int i = 0; i < performanceByYear.size(); i++) {
             Row row = sheet.createRow(i + 1);
             GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = performanceByYear.get(i);
@@ -459,7 +520,8 @@ public class AnalysisService {
             // 定义 Sheet 名称和数据列表
             // 创建多个 Sheet 并写入数据
             for (String url : urls) {
-                createP99Sheet(workbook, url, urlMap.get(url));
+                String sheetName = url.substring(url.lastIndexOf("/") + 1);
+                createP99ModelSheet(workbook, sheetName, urlMap.get(url), "gateway 99线", "日期", "99线", "99线");
             }
             // 6. 保存文件
             workbook.write(response.getOutputStream());
@@ -467,28 +529,6 @@ public class AnalysisService {
             log.error("AnalysisService#get99LineCurve,出现异常！", e);
         }
         return "success";
-    }
-
-    private static void createP99Sheet(XSSFWorkbook workbook, String url, List<P99Model> p99Models) {
-        // 99线
-        // 创建工作表
-        // 将url按照"/"分割，取最后一个元素作为sheetName
-        String sheetName = url.substring(url.lastIndexOf("/") + 1);
-        XSSFSheet sheet = workbook.createSheet(sheetName);
-        // 写入数据
-        createP99ModelsData(sheet, p99Models);
-        // 3. 创建绘图对象
-        XSSFDrawing drawing = sheet.createDrawingPatriarch();
-        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
-        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
-        int endCol = anchor.getCol1() + chartWidthCols;
-        anchor.setCol2(anchor.getCol1() + endCol);
-        // 4. 创建图表对象
-        XSSFChart chart = drawing.createChart(anchor);
-        chart.setTitleText("gateway 99线");
-        chart.setTitleOverlay(false);
-        // 5. 配置图表数据
-        TableUtils.configurePerformanceLineChartData(chart, sheet, "日期",  "99线", "99线");
     }
 
     public String batchGetSlowRequestRateCurve(String[] urls,
@@ -509,7 +549,8 @@ public class AnalysisService {
             // 定义 Sheet 名称和数据列表
             // 创建多个 Sheet 并写入数据
             for (String url : urls) {
-                createSlowRequestRateSheet(workbook, url, urlMap.get(url));
+                String sheetName = url.substring(url.lastIndexOf("/") + 1);
+                createSlowRequestRateModelSheet(workbook, sheetName, urlMap.get(url), "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
             }
             // 6. 保存文件
             workbook.write(response.getOutputStream());
@@ -519,42 +560,11 @@ public class AnalysisService {
         return "success";
     }
 
-    private void createSlowRequestRateSheet(XSSFWorkbook workbook,
-                                            String url,
-                                            List<SlowRequestRateModel> slowRequestRateModels) {
-        // 创建工作表
-        // 将url按照"/"分割，取最后一个元素作为sheetName
-        String sheetName = url.substring(url.lastIndexOf("/") + 1);
-        XSSFSheet sheet = workbook.createSheet(sheetName);
-        // 写入数据
-        createSlowRequestRateModelsData(sheet, slowRequestRateModels);
-        // 3. 创建绘图对象
-        XSSFDrawing drawing = sheet.createDrawingPatriarch();
-        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
-        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
-        int endCol = anchor.getCol1() + chartWidthCols;
-        anchor.setCol2(anchor.getCol1() + endCol);
-        // 4. 创建图表对象
-        XSSFChart chart = drawing.createChart(anchor);
-        chart.setTitleText("gateway 慢请求率");
-        chart.setTitleOverlay(false);
-        // 5. 配置图表数据
-        // 性能折线图
-        TableUtils.configurePerformanceLineChartData(chart, sheet, "日期",  "慢请求率", "慢请求率");
-    }
-
     private List<SlowRequestRateModel> getSlowRequestRateModelsNew(List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities) {
         List<SlowRequestRateModel> slowRequestRateModels = new ArrayList<>();
         for (ApiDailyPerformanceEntity apiDailyPerformanceEntity : apiDailyPerformanceEntities) {
             SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
-            Date date = apiDailyPerformanceEntity.getDate();
-            // 将 Date 对象转换为 LocalDate 对象
-            Instant instant = date.toInstant();
-            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-            // 定义日期格式
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            // 将 LocalDate 对象转换为字符串
-            String dateString = localDate.format(formatter);
+            String dateString = DateUtils.getDateString(apiDailyPerformanceEntity.getDate(), DateUtils.YYYY_MM_DD);
             slowRequestRateModel.setDate(dateString);
             double totalRequests = apiDailyPerformanceEntity.getTotalRequestCount();
             double slowRequestRate = totalRequests > 0
