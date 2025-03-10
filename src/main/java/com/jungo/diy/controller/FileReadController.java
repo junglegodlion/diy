@@ -296,8 +296,6 @@ public class FileReadController {
         }
     }
 
-
-
     public static void createSlowRequestRateModelSheet(XSSFWorkbook workbook,
                                                  String sheetName,
                                                  List<SlowRequestRateModel> slowRequestRateModels,
@@ -305,47 +303,27 @@ public class FileReadController {
                                                  String xTitle,
                                                  String yTitle,
                                                  String seriesTitle) {
-        // 创建工作表
-        XSSFSheet sheet = workbook.createSheet(sheetName);
-        // 写入数据
-        createSlowRequestRateModelsData(workbook, sheet, slowRequestRateModels);
-        // 3. 创建绘图对象
-        XSSFDrawing drawing = sheet.createDrawingPatriarch();
-        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
-        int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
-        int endCol = anchor.getCol1() + chartWidthCols;
-        anchor.setCol2(anchor.getCol1() + endCol);
-        // 4. 创建图表对象
-        XSSFChart chart = drawing.createChart(anchor);
-        chart.setTitleText(titleText);
-        chart.setTitleOverlay(false);
-        // 5. 配置图表数据
-        configurePerformanceLineChartData(chart, sheet, xTitle, yTitle, seriesTitle);
+        String[] columnTitles = {"日期", "慢请求率"};
+        createModelSheet(workbook, sheetName, slowRequestRateModels, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
+            switch (columnIndex) {
+                case 0:
+                    cell.setCellValue(model.getDate());
+                    break;
+                case 1:
+                    cell.setCellValue(model.getSlowRequestRate());
+                    cell.setCellStyle(getPercentageCellStyle(workbook));
+                    break;
+            }
+        });
 
     }
 
-    private static void createSlowRequestRateModelsData(XSSFWorkbook workbook,
-                                                 XSSFSheet sheet,
-                                                 List<SlowRequestRateModel> slowRequestRateModels) {
-        Row headerRow = sheet.createRow(0);
-        headerRow.createCell(0).setCellValue("日期");
-        headerRow.createCell(1).setCellValue("慢请求率");
-
-        // 填充数据行
-        List<String> dates = slowRequestRateModels.stream().map(SlowRequestRateModel::getDate).collect(Collectors.toList());
-        List<Double> slowRequestRateValues = slowRequestRateModels.stream().map(SlowRequestRateModel::getSlowRequestRate).collect(Collectors.toList());
-        // 创建百分比格式
+    private static CellStyle getPercentageCellStyle(XSSFWorkbook workbook) {
         DataFormat dataFormat = workbook.createDataFormat();
         short percentageFormat = dataFormat.getFormat("0.00%");
         CellStyle percentageCellStyle = workbook.createCellStyle();
         percentageCellStyle.setDataFormat(percentageFormat);
-        for (int i = 0; i < dates.size(); i++) {
-            Row row = sheet.createRow(i + 1);
-            row.createCell(0).setCellValue(dates.get(i));
-            Cell cell = row.createCell(1);
-            cell.setCellValue(slowRequestRateValues.get(i));
-            cell.setCellStyle(percentageCellStyle);
-        }
+        return percentageCellStyle;
     }
 
     public static void createP99ModelSheet(XSSFWorkbook workbook,
@@ -355,12 +333,64 @@ public class FileReadController {
                                      String xTitle,
                                      String yTitle,
                                      String seriesTitle) {
-        // 99线
+        String[] columnTitles = {"日期", "99线"};
+        createModelSheet(workbook, sheetName, p99Models, columnTitles, titleText, xTitle, yTitle, seriesTitle, (model, columnIndex, cell) -> {
+            switch (columnIndex) {
+                case 0:
+                    cell.setCellValue(model.getDate());
+                    break;
+                case 1:
+                    cell.setCellValue(model.getP99());
+                    break;
+            }
+        });
+    }
+
+    public static <P> void createModelSheet(XSSFWorkbook workbook,
+                                            String sheetName,
+                                            List<P> models,
+                                            String[] columnTitles,
+                                            String titleText,
+                                            String xTitle,
+                                            String yTitle,
+                                            String seriesTitle,
+                                            Extractor<P> extractor) {
         // 创建工作表
         XSSFSheet sheet = workbook.createSheet(sheetName);
         // 写入数据
-        createP99ModelsData(sheet, p99Models);
-        // 3. 创建绘图对象
+        createChartData(workbook, sheet, models, columnTitles, extractor);
+        // 创建绘图对象
+        XSSFChart chart = createXssfChart(titleText, sheet);
+        // 配置图表数据
+        configurePerformanceLineChartData(chart, sheet, xTitle, yTitle, seriesTitle);
+    }
+
+    public static <P> void createChartData(XSSFWorkbook workbook, XSSFSheet sheet, List<P> models, String[] columnTitles, Extractor<P> extractor) {
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < columnTitles.length; i++) {
+            headerRow.createCell(i).setCellValue(columnTitles[i]);
+        }
+
+        // 创建数据行
+        for (int i = 0; i < models.size(); i++) {
+            Row row = sheet.createRow(i + 1);
+            for (int j = 0; j < columnTitles.length; j++) {
+                Cell cell = row.createCell(j);
+                extractor.extract(models.get(i), j, cell);
+            }
+        }
+    }
+
+    // 定义一个提取器接口
+    @FunctionalInterface
+    public interface Extractor<P> {
+        void extract(P model, int columnIndex, Cell cell);
+    }
+
+
+
+
+    private static XSSFChart createXssfChart(String titleText, XSSFSheet sheet) {
         XSSFDrawing drawing = sheet.createDrawingPatriarch();
         XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 5, 13, 20);
         int chartWidthCols = (int) Math.ceil((sheet.getLastRowNum() - 1) * 0.5);
@@ -370,8 +400,7 @@ public class FileReadController {
         XSSFChart chart = drawing.createChart(anchor);
         chart.setTitleText(titleText);
         chart.setTitleOverlay(false);
-        // 5. 配置图表数据
-        configurePerformanceLineChartData(chart, sheet, xTitle, yTitle, seriesTitle);
+        return chart;
     }
 
     public static void configurePerformanceLineChartData(XSSFChart chart,
@@ -433,8 +462,6 @@ public class FileReadController {
 
         // 5. 绘制图表
         chart.plot(data);
-
-
     }
 
     public static void createP99ModelsData(XSSFSheet sheet, List<P99Model> p99Models) {
