@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 
+import static com.jungo.diy.util.DateUtils.MM_DD;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
 /**
@@ -138,8 +139,8 @@ public class WordDocumentGenerator {
                                        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses,
                                        LocalDate startDate,
                                        LocalDate endDate) {
-        String startDateString = DateUtils.getDateString(startDate, YYYY_MM_DD);
-        String endDateString = DateUtils.getDateString(endDate, YYYY_MM_DD);
+        String startDateString = DateUtils.getDateString(startDate, MM_DD);
+        String endDateString = DateUtils.getDateString(endDate, MM_DD);
         String[] headers = {"页面名称",
                 "接口",
                 startDateString + "日99线",

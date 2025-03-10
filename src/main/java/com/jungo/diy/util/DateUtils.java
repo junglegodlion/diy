@@ -14,6 +14,7 @@ import java.util.Date;
 public class DateUtils {
 
     public static final String YYYY_MM_DD = "yyyy-MM-dd";
+    public static final String MM_DD = "MM-dd";
     public static final String YYYY_MM = "yyyy-MM";
 
     private DateUtils() {}
