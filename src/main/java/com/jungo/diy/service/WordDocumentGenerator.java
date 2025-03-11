@@ -12,8 +12,15 @@ import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.Units;
+import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlException;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartUtils;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.openxmlformats.schemas.drawingml.x2006.chart.CTChart;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyles;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
@@ -118,11 +125,15 @@ public class WordDocumentGenerator {
 
             /*月慢请求率趋势*/
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
+            // 生成折线图
+            insertLineChart(document, monthlySlowRequestRateTrendData, "慢请求率趋势", "日期", "百分比", true);
+
             // jungo TODO 2025/3/10:补充图片
 
 
             /*月99线趋势*/
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 99线趋势");
+            insertLineChart(document, monthlySlowRequestRateTrendData, "99线趋势", "日期", "毫秒", false);
             // jungo TODO 2025/3/10:补充图片
 
             /*2025年周维度99线趋势*/
@@ -156,8 +167,72 @@ public class WordDocumentGenerator {
             }
         }
 
+
+
     }
 
+    // 新增POI图表插入方法
+    private void insertLineChart(XWPFDocument doc,
+                                 List<GateWayDailyPerformanceEntity> data,
+                                 String title,
+                                 String categoryAxisLabel,
+                                 String valueAxisLabel,
+                                 boolean isPercentage) {
+        // 创建图表段落
+        XWPFParagraph p = doc.createParagraph();
+        XWPFRun r = p.createRun();
+        r.setText(title); // 图表标题占位文本
+        r.addBreak();
+
+        // 创建图表
+        XWPFChart chart = null;
+        try {
+            chart = doc.createChart(r, 15 * Units.EMU_PER_CENTIMETER, 10 * Units.EMU_PER_CENTIMETER);
+        } catch (InvalidFormatException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // 配置图表数据
+        String[] categories = data.stream()
+                .map(e -> DateUtils.getDateString(e.getDate(), MM_DD))
+                .toArray(String[]::new);
+
+        Double[] values = data.stream()
+                .map(e -> isPercentage ? e.getSlowRequestRate() * 100 : (double)e.getP99())
+                .toArray(Double[]::new);
+
+        // 创建数据源
+        XDDFCategoryDataSource categoryDS = XDDFDataSourcesFactory.fromArray(categories);
+        XDDFNumericalDataSource<Double> valueDS = XDDFDataSourcesFactory.fromArray(values);
+
+        // 创建轴时保存引用（原代码修改）
+        XDDFCategoryAxis categoryAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+        XDDFValueAxis valueAxis = chart.createValueAxis(AxisPosition.LEFT);
+        // 创建折线图数据
+        XDDFLineChartData lineChartData = (XDDFLineChartData) chart.createData(
+                ChartTypes.LINE,
+                categoryAxis,
+                valueAxis
+        );
+
+        // 添加系列数据
+        XDDFLineChartData.Series series = (XDDFLineChartData.Series) lineChartData.addSeries(
+                categoryDS,
+                valueDS
+        );
+        series.setTitle("趋势", null);
+
+        // 应用数据到图表
+        chart.plot(lineChartData);
+
+
+        // 设置Y轴显示百分比格式
+        // 设置数值轴格式（原报错位置修改）
+        valueAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+        valueAxis.setNumberFormat(isPercentage ? "0%" : "0");
+    }
     private void drawRequestVolumeTopInterfaceTable(XWPFDocument document,
                                                     List<UrlPerformanceResponse> responses,
                                                     LocalDate startDate,
