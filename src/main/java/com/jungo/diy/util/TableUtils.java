@@ -9,18 +9,18 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xddf.usermodel.PresetColor;
 import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xssf.usermodel.*;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.*;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
 import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static com.jungo.diy.util.ExcelChartGenerator.*;
 
@@ -58,19 +58,39 @@ public class TableUtils {
     public static XWPFTable createXwpfTable(XWPFDocument document, int rows, int cols) {
         // 插入表格前创建段落
         XWPFParagraph tableParagraph = document.createParagraph();
-        // 添加空行分隔
-        tableParagraph.createRun().addBreak();
+        // 设置表格后间距（200=1行高度）
+        tableParagraph.setSpacingAfter(200);
         XWPFTable table = document.createTable(rows, cols);
         // 设置表格宽度（占页面宽度的100%）
         table.setWidth("100%");
-        // 设置表格边框（必须）
+
+        // 设置自适应列宽（关键改进）
+        table.setTableAlignment(TableRowAlign.CENTER);
+        // 单元格边距（单位：twips）
+        table.setCellMargins(100, 100, 100, 100);
+        // 优化边框样式
         CTTblBorders borders = table.getCTTbl().addNewTblPr().addNewTblBorders();
-        borders.addNewBottom().setVal(STBorder.SINGLE);
-        borders.addNewLeft().setVal(STBorder.SINGLE);
-        borders.addNewRight().setVal(STBorder.SINGLE);
-        borders.addNewTop().setVal(STBorder.SINGLE);
-        borders.addNewInsideH().setVal(STBorder.SINGLE);
-        borders.addNewInsideV().setVal(STBorder.SINGLE);
+        Stream.of(borders.addNewBottom(), borders.addNewLeft(), borders.addNewRight(),
+                        borders.addNewTop(), borders.addNewInsideH(), borders.addNewInsideV())
+                .forEach(b -> {
+                    b.setVal(STBorder.SINGLE);
+                    b.setSz(BigInteger.valueOf(4));  // 边框粗细（4=0.5pt）
+                    b.setColor("000000"); // 黑色边框
+                });
+
+        // 设置单元格文本不换行（关键改进）
+        table.getRows().forEach(row ->
+                row.getTableCells().forEach(cell -> {
+                    XWPFParagraph para = cell.getParagraphs().get(0);
+                    para.setAlignment(ParagraphAlignment.CENTER); // 水平居中
+                    XWPFRun run = para.createRun();
+                    run.setFontFamily("宋体"); // 设置中文字体
+                    run.setFontSize(10); // 统一字号
+                    cell.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER); // 垂直居中
+                    // 禁止自动换行（通过OpenXML底层配置）
+                    cell.getCTTc().addNewTcPr().addNewNoWrap();
+                })
+        );
         return table;
     }
 
