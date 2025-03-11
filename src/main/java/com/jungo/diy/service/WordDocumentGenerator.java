@@ -2,6 +2,7 @@ package com.jungo.diy.service;
 
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.enums.InterfaceTypeEnum;
+import com.jungo.diy.model.PerformanceResult;
 import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.repository.PerformanceRepository;
@@ -23,10 +24,10 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.jungo.diy.util.DateUtils.MM_DD;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
@@ -37,6 +38,24 @@ import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 @Service
 @Slf4j
 public class WordDocumentGenerator {
+
+    // 新增常量类定义列索引（避免硬编码）
+    private static class TableColumns {
+        public static final int PAGE_NAME = 0;
+        public static final int URL = 1;
+        public static final int LAST_WEEK_P99 = 2;
+        public static final int THIS_WEEK_P99 = 3;
+        public static final int LAST_WEEK_COUNT = 4;
+        public static final int THIS_WEEK_COUNT = 5;
+        public static final int LAST_WEEK_SLOW_RATE = 6;
+        public static final int THIS_WEEK_SLOW_RATE = 7;
+        public static final int P99_CHANGE = 8;
+        public static final int P99_CHANGE_RATE = 9;
+        // 仅关键链路表使用
+        public static final int P99_TARGET = 10;
+        // 仅关键链路表使用
+        public static final int REACH_TARGET = 11;
+    }
 
     /**
      * word整体样式
@@ -61,6 +80,9 @@ public class WordDocumentGenerator {
     @Autowired
     private PerformanceRepository performanceRepository;
 
+    @Autowired
+    private AnalysisService analysisService;
+
     public void generateWordDocument(String filePath,
                                      LocalDate startDate,
                                      LocalDate endDate) throws IOException, InvalidFormatException {
@@ -77,9 +99,7 @@ public class WordDocumentGenerator {
         LocalDate startDateForMonthSlowRequestRateTrend = endDate.minusDays(30);
         List<GateWayDailyPerformanceEntity> monthlySlowRequestRateTrendData = performanceRepository.getMonthlySlowRequestRateTrendData(startDateForMonthSlowRequestRateTrend, endDate);
 
-        Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
-        // 关键链路
-        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
+        PerformanceResult result = analysisService.getPerformanceResult(startDate, endDate);
 
         // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
@@ -117,15 +137,18 @@ public class WordDocumentGenerator {
             /*核心接口监控接口*/
             setFirstLevelTitle(document, "核心接口监控接口");
             setSecondLevelTitle(document, "一、关键路径");
-            drawCriticalPathTable(document, criticalLinkUrlPerformanceResponses, startDate, endDate);
+            drawCriticalPathTable(document, result.getCriticalLinkUrlPerformanceResponses(), startDate, endDate);
             setSecondLevelTitle(document, "二、五大金刚");
+            drawTheFiveGreatVajrasTable(document, result.getFiveGangJingUrlPerformanceResponses(), startDate, endDate);
             setSecondLevelTitle(document, "三、首屏TAB");
+            drawFirstScreenTabTable(document, result.getFirstScreenTabUrlPerformanceResponses(), startDate, endDate);
             setSecondLevelTitle(document, "四、活动页关键组件（麒麟组件接口）");
+            drawQilinComponentInterfaceTable(document, result.getQilinComponentInterfaceUrlPerformanceResponses(), startDate, endDate);
             setSecondLevelTitle(document, "五、其他核心业务接口");
+            drawOtherCoreBusinessInterfaceTable(document, result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(), startDate, endDate);
             setSecondLevelTitle(document, "六、请求量TOP接口");
+            drawRequestVolumeTopInterfaceTable(document, result.getAccessVolumeTop30Interface(), startDate, endDate);
 
-            // 获取关键路径的接口数据
-            setCriticalLinkTable(document, criticalLinkUrlPerformanceResponses);
             setImage(document);
             // 保存文档
             try (FileOutputStream out = new FileOutputStream(filePath)) {
@@ -135,35 +158,124 @@ public class WordDocumentGenerator {
 
     }
 
+    private void drawRequestVolumeTopInterfaceTable(XWPFDocument document,
+                                                    List<UrlPerformanceResponse> responses,
+                                                    LocalDate startDate,
+                                                    LocalDate endDate) {
+        drawCommonTable(document, responses, startDate, endDate, false);
+    }
+
+    private void drawOtherCoreBusinessInterfaceTable(XWPFDocument document,
+                                                     List<UrlPerformanceResponse> responses,
+                                                     LocalDate startDate,
+                                                     LocalDate endDate) {
+
+
+        drawCommonTable(document, responses, startDate, endDate, false);
+    }
+
+    private void drawQilinComponentInterfaceTable(XWPFDocument document,
+                                                  List<UrlPerformanceResponse> responses,
+                                                  LocalDate startDate,
+                                                  LocalDate endDate) {
+
+
+        drawCommonTable(document, responses, startDate, endDate, false);
+    }
+
+    private void drawFirstScreenTabTable(XWPFDocument document,
+                                         List<UrlPerformanceResponse> responses,
+                                         LocalDate startDate,
+                                         LocalDate endDate) {
+        drawCommonTable(document, responses, startDate, endDate, false);
+
+    }
+
+    // 通用绘制方法
+    private void drawCommonTable(XWPFDocument document,
+                                 List<UrlPerformanceResponse> dataList,
+                                 LocalDate startDate,
+                                 LocalDate endDate,
+                                 boolean isCriticalPath) { // 标识是否关键链路表
+
+        // 日期格式化提取到公共方法
+        String[] dateStrings = getFormattedDates(startDate, endDate);
+
+        // 动态构建表头
+        List<String> headerList = new ArrayList<>(Arrays.asList(
+                "页面名称",
+                "接口",
+                dateStrings[0] + "日99线",
+                dateStrings[1] + "日99线",
+                dateStrings[0] + "日调用量",
+                dateStrings[1] + "日调用量",
+                dateStrings[0] + "慢请求(300ms)率",
+                dateStrings[1] + "慢请求(300ms)率",
+                "接口性能变化（ms）",
+                "99线环比"
+        ));
+
+        // 关键链路表追加特殊列
+        if (isCriticalPath) {
+            headerList.addAll(Arrays.asList(
+                    "99线基线目标",
+                    "是否达到目标"
+            ));
+        }
+
+        // 执行绘制
+        drawTable(document, dataList, headerList.toArray(new String[0]), (row, entity) -> {
+            // 空指针防御
+            if (row == null || entity == null) {
+                return;
+            }
+
+            // 公共字段填充
+            fillCommonCells(row, entity);
+
+            // 关键链路表特殊处理
+            if (isCriticalPath) {
+                row.getCell(TableColumns.P99_TARGET).setText(String.valueOf(entity.getP99Target()));
+                row.getCell(TableColumns.REACH_TARGET).setText(String.valueOf(entity.getReachTarget()));
+            }
+        });
+    }
+
+    // 公共字段填充方法
+    private void fillCommonCells(XWPFTableRow row, UrlPerformanceResponse entity) {
+        row.getCell(TableColumns.PAGE_NAME).setText(entity.getPageName());
+        row.getCell(TableColumns.URL).setText(entity.getUrl());
+        row.getCell(TableColumns.LAST_WEEK_P99).setText(String.valueOf(entity.getLastWeekP99()));
+        row.getCell(TableColumns.THIS_WEEK_P99).setText(String.valueOf(entity.getThisWeekP99()));
+        row.getCell(TableColumns.LAST_WEEK_COUNT).setText(String.valueOf(entity.getLastWeekTotalRequestCount()));
+        row.getCell(TableColumns.THIS_WEEK_COUNT).setText(String.valueOf(entity.getThisWeekTotalRequestCount()));
+        row.getCell(TableColumns.LAST_WEEK_SLOW_RATE).setText(TableUtils.getPercentageFormatDouble(entity.getLastWeekSlowRequestRate()));
+        row.getCell(TableColumns.THIS_WEEK_SLOW_RATE).setText(TableUtils.getPercentageFormatDouble(entity.getThisWeekSlowRequestRate()));
+        row.getCell(TableColumns.P99_CHANGE).setText(String.valueOf(entity.getP99Change()));
+        row.getCell(TableColumns.P99_CHANGE_RATE).setText(TableUtils.getPercentageFormatDouble(entity.getP99ChangeRate()));
+    }
+
+    // 日期格式化工具方法
+    private String[] getFormattedDates(LocalDate start, LocalDate end) {
+        return new String[]{
+                DateUtils.getDateString(start, MM_DD),
+                DateUtils.getDateString(end, MM_DD)
+        };
+    }
+
+    // 原方法改造为
+    private void drawTheFiveGreatVajrasTable(XWPFDocument document,
+                                             List<UrlPerformanceResponse> responses,
+                                             LocalDate startDate,
+                                             LocalDate endDate) {
+        drawCommonTable(document, responses, startDate, endDate, false);
+    }
+
     private void drawCriticalPathTable(XWPFDocument document,
-                                       List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses,
+                                       List<UrlPerformanceResponse> responses,
                                        LocalDate startDate,
                                        LocalDate endDate) {
-        String startDateString = DateUtils.getDateString(startDate, MM_DD);
-        String endDateString = DateUtils.getDateString(endDate, MM_DD);
-        String[] headers = {"页面名称",
-                "接口",
-                startDateString + "日99线",
-                endDateString + "日99线",
-                startDateString + "日调用量",
-                endDateString + "日调用量",
-                startDateString + "慢请求(300ms)率",
-                endDateString + "慢请求(300ms)率",
-                "接口性能变化（ms）",
-                "99线环比"};
-
-        drawTable(document, criticalLinkUrlPerformanceResponses, headers, (row, entity) -> {
-            row.getCell(0).setText(entity.getPageName());
-            row.getCell(1).setText(entity.getUrl());
-            row.getCell(2).setText(String.valueOf(entity.getLastWeekP99()));
-            row.getCell(3).setText(String.valueOf(entity.getThisWeekP99()));
-            row.getCell(4).setText(String.valueOf(entity.getLastWeekTotalRequestCount()));
-            row.getCell(5).setText(String.valueOf(entity.getThisWeekTotalRequestCount()));
-            row.getCell(6).setText(TableUtils.getPercentageFormatDouble(entity.getLastWeekSlowRequestRate()));
-            row.getCell(7).setText(TableUtils.getPercentageFormatDouble(entity.getThisWeekSlowRequestRate()));
-            row.getCell(8).setText(String.valueOf(entity.getP99Change()));
-            row.getCell(9).setText(TableUtils.getPercentageFormatDouble(entity.getP99ChangeRate()));
-        });
+        drawCommonTable(document, responses, startDate, endDate, true);
     }
 
 
@@ -232,23 +344,6 @@ public class WordDocumentGenerator {
             double slowRequestRate = gatewayAverageSlowRequestRate.get(i).getSlowRequestRate();
             String format = TableUtils.getPercentageFormatDouble(slowRequestRate);
             row.getCell(i).setText(format);
-        }
-    }
-
-    private static void setCriticalLinkTable(XWPFDocument document, List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses) {
-        XWPFTable table = TableUtils.createXwpfTable(document, criticalLinkUrlPerformanceResponses.size() + 1, 9);
-        // 设置表格表头
-        XWPFTableRow headerRow = table.getRow(0);
-        XWPFTableCell pageNameCell = headerRow.getCell(0);
-        pageNameCell.setText("pageName");
-        pageNameCell.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
-
-        // 填充单元格内容
-        for (int i = 0; i < criticalLinkUrlPerformanceResponses.size(); i++) {
-            XWPFTableRow row = table.getRow(i + 1);
-            UrlPerformanceResponse urlPerformanceResponse = criticalLinkUrlPerformanceResponses.get(i);
-            XWPFTableCell cell = row.getCell(0);
-            cell.setText(urlPerformanceResponse.getPageName());
         }
     }
 

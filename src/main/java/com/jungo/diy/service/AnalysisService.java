@@ -7,6 +7,7 @@ import com.jungo.diy.enums.InterfaceTypeEnum;
 import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.model.P99Model;
+import com.jungo.diy.model.PerformanceResult;
 import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.repository.PerformanceRepository;
@@ -118,6 +119,28 @@ public class AnalysisService {
                                             LocalDate endDate,
                                             HttpServletResponse response) {
 
+        PerformanceResult result = getPerformanceResult(startDate, endDate);
+
+        List<UrlPerformanceResponse>[] dataLists = new List[]{
+                result.getCriticalLinkUrlPerformanceResponses(),
+                result.getFiveGangJingUrlPerformanceResponses(),
+                result.getFirstScreenTabUrlPerformanceResponses(),
+                result.getQilinComponentInterfaceUrlPerformanceResponses(),
+                result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(),
+                result.getAccessVolumeTop30Interface()
+        };
+
+        try {
+            exportService.exportToExcel(dataLists, response);
+        } catch (IOException e) {
+            log.error("AnalysisService#getCorePerformanceCompare,出现异常！", e);
+        }
+
+        // 返回未达标的接口：格式如下：【轮胎列表页】/cl-tire-site/tireListModule/getTireList 99线：513ms 99线基线目标：450ms  @平会
+        return getUnReachTargetUrl(dataLists);
+    }
+
+    public PerformanceResult getPerformanceResult(LocalDate startDate, LocalDate endDate) {
         Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
         // 关键链路
         List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
@@ -150,24 +173,31 @@ public class AnalysisService {
                 })
                 .map(urlPerformanceModel -> getUrlPerformanceResponse(urlPerformanceModel.getUrl(), urlPerformanceModelMap))
                 .collect(Collectors.toList());
+        return new PerformanceResult(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface);
+    }
 
-        List<UrlPerformanceResponse>[] dataLists = new List[]{
-                criticalLinkUrlPerformanceResponses,
-                fiveGangJingUrlPerformanceResponses,
-                firstScreenTabUrlPerformanceResponses,
-                qilinComponentInterfaceUrlPerformanceResponses,
-                otherCoreBusinessInterfaceUrlPerformanceResponses,
-                accessVolumeTop30Interface
-        };
+    private static UrlPerformanceResponse getUrlPerformanceResponse(String url,
+                                                                    Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
+        UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
+        UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
+        urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
+        urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
+        urlPerformanceResponse.setLastWeekP99(urlPerformanceModel.getLastWeek().getP99());
+        urlPerformanceResponse.setThisWeekP99(urlPerformanceModel.getThisWeek().getP99());
+        urlPerformanceResponse.setLastWeekTotalRequestCount(urlPerformanceModel.getLastWeek().getTotalRequestCount());
+        urlPerformanceResponse.setThisWeekTotalRequestCount(urlPerformanceModel.getThisWeek().getTotalRequestCount());
+        urlPerformanceResponse.setLastWeekSlowRequestRate(urlPerformanceModel.getLastWeek().getSlowRequestRate());
+        urlPerformanceResponse.setThisWeekSlowRequestRate(urlPerformanceModel.getThisWeek().getSlowRequestRate());
+        urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
+        urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
+        // 99线是否达到目标值
+        urlPerformanceResponse.setReachTarget(!(urlPerformanceModel.getP99ChangeRate() >= 0.1) || urlPerformanceModel.getP99Change() < 30);
+        return urlPerformanceResponse;
+    }
 
-        try {
-            exportService.exportToExcel(dataLists, response);
-        } catch (IOException e) {
-            log.error("AnalysisService#getCorePerformanceCompare,出现异常！", e);
-        }
 
-        // 返回未达标的接口：格式如下：【轮胎列表页】/cl-tire-site/tireListModule/getTireList 99线：513ms 99线基线目标：450ms  @平会
-        return getUnReachTargetUrl(dataLists);
+    private static boolean coreInterfaceContains(List<UrlPerformanceResponse> urlPerformanceResponses, String url) {
+        return urlPerformanceResponses.stream().anyMatch(coreInterfaceConfigEntity -> url.equals(coreInterfaceConfigEntity.getUrl()));
     }
 
     private String getUnReachTargetUrl(List<UrlPerformanceResponse>[] dataLists) {
@@ -196,28 +226,7 @@ public class AnalysisService {
         return str.toString();
     }
 
-    private static boolean coreInterfaceContains(List<UrlPerformanceResponse> urlPerformanceResponses, String url) {
-        return urlPerformanceResponses.stream().anyMatch(coreInterfaceConfigEntity -> url.equals(coreInterfaceConfigEntity.getUrl()));
-    }
 
-    private static UrlPerformanceResponse getUrlPerformanceResponse(String url,
-                                                                    Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
-        UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
-        UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
-        urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
-        urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
-        urlPerformanceResponse.setLastWeekP99(urlPerformanceModel.getLastWeek().getP99());
-        urlPerformanceResponse.setThisWeekP99(urlPerformanceModel.getThisWeek().getP99());
-        urlPerformanceResponse.setLastWeekTotalRequestCount(urlPerformanceModel.getLastWeek().getTotalRequestCount());
-        urlPerformanceResponse.setThisWeekTotalRequestCount(urlPerformanceModel.getThisWeek().getTotalRequestCount());
-        urlPerformanceResponse.setLastWeekSlowRequestRate(urlPerformanceModel.getLastWeek().getSlowRequestRate());
-        urlPerformanceResponse.setThisWeekSlowRequestRate(urlPerformanceModel.getThisWeek().getSlowRequestRate());
-        urlPerformanceResponse.setP99Change(urlPerformanceModel.getP99Change());
-        urlPerformanceResponse.setP99ChangeRate(urlPerformanceModel.getP99ChangeRate());
-        // 99线是否达到目标值
-        urlPerformanceResponse.setReachTarget(!(urlPerformanceModel.getP99ChangeRate() >= 0.1) || urlPerformanceModel.getP99Change() < 30);
-        return urlPerformanceResponse;
-    }
 
     /**
      * 生成网关性能曲线图表并导出为Excel文件
