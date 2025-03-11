@@ -21,6 +21,8 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTChart;
+import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
+import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyles;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
@@ -181,13 +183,15 @@ public class WordDocumentGenerator {
         // 创建图表段落
         XWPFParagraph p = doc.createParagraph();
         XWPFRun r = p.createRun();
-        r.setText(title); // 图表标题占位文本
+        // 图表标题占位文本
+        r.setText(title);
         r.addBreak();
 
         // 创建图表
         XWPFChart chart = null;
         try {
-            chart = doc.createChart(r, 15 * Units.EMU_PER_CENTIMETER, 10 * Units.EMU_PER_CENTIMETER);
+            int chartWidthCols = (int) Math.ceil((data.size() - 1) * 0.5);
+            chart = doc.createChart(r, chartWidthCols * Units.EMU_PER_CENTIMETER, 10 * Units.EMU_PER_CENTIMETER);
         } catch (InvalidFormatException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
@@ -223,6 +227,22 @@ public class WordDocumentGenerator {
                 valueDS
         );
         series.setTitle("趋势", null);
+        CTDLbls dLbls = chart.getCTChart().getPlotArea().getLineChartArray(0).getSerArray(0).addNewDLbls();
+        // 仅显示数值
+        dLbls.addNewShowVal().setVal(true);
+        // 不显示图例键
+        dLbls.addNewShowLegendKey().setVal(false);
+        // 不显示类别名称
+        dLbls.addNewShowCatName().setVal(false);
+        dLbls.addNewShowSerName().setVal(false);
+        // 标签位置设置为顶部
+        // 尝试设置标签位置为顶部
+        try {
+            dLbls.addNewDLblPos().setVal(STDLblPos.T);
+        } catch (Exception e) {
+            // 处理异常，可能是由于模式文件缺失或其他原因
+            System.err.println("Failed to set data label position: " + e.getMessage());
+        }
 
         // 应用数据到图表
         chart.plot(lineChartData);
