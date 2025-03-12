@@ -582,6 +582,26 @@ public class AnalysisService {
         return "success";
     }
 
+    public XSSFWorkbook batchGet99LineCurve(String[] urls, @PastOrPresent LocalDate startDate) {
+        Map<String, List<P99Model>> urlMap = new HashMap<>();
+        LocalDate now = LocalDate.now();
+        for (String url : urls) {
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, now);
+            // apiDailyPerformanceEntities按照日期排序
+            apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
+            List<P99Model> p99Models = getP99Models(apiDailyPerformanceEntities);
+            urlMap.put(url, p99Models);
+        }
+
+        // 画图
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        for (String url : urls) {
+            String sheetName = url.substring(url.lastIndexOf("/") + 1);
+            createP99ModelSheet(workbook, sheetName, urlMap.get(url), "gateway 99线", "日期", "99线", "99线");
+        }
+        return workbook;
+    }
+
     public String batchGetSlowRequestRateCurve(String[] urls,
                                                @PastOrPresent LocalDate startDate,
                                                LocalDate endDate,

@@ -16,6 +16,7 @@ import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlException;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
 import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSimpleField;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static com.jungo.diy.util.DateUtils.MM_DD;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
@@ -96,29 +98,55 @@ public class ReportGenerationService {
         PerformanceResult result = analysisService.getPerformanceResult(startDate, endDate);
         // 生成网关性能变化曲线图
         generateGateWayPerformanceCurveChart(endDate, directoryPath);
+        // 关键路径未达标接口性能曲线图
+        generateTrendChartOfCriticalPath99NotMeetingTheStandard(result.getCriticalLinkUrlPerformanceResponses(), endDate, directoryPath);
         // 生成word文档
         generateWord(startDate, endDate, result, directoryPath);
 
         return directoryPath;
     }
 
+    private void generateTrendChartOfCriticalPath99NotMeetingTheStandard(List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses,
+                                                                         LocalDate endDate,
+                                                                         String directoryPath) {
+        LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
+        List<String> urls = criticalLinkUrlPerformanceResponses.stream().filter(x -> Boolean.FALSE.equals(x.getReachTarget())).map(x -> x.getUrl()).collect(Collectors.toList());
+        String[] urlsArray = urls.toArray(new String[0]);
+
+        try (XSSFWorkbook workbook = analysisService.batchGet99LineCurve(urlsArray, startDateForMonthPerformanceTrend)) {
+            String fileName = URLEncoder.encode("TrendChartOfCriticalPath99NotMeetingTheStandard.xlsx", StandardCharsets.UTF_8.toString());
+            /* 执行文件写入操作 */
+            saveWorkbookToFile(workbook, directoryPath, fileName);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // 优化文件保存逻辑（复用该方法）
+    private void saveWorkbookToFile(XSSFWorkbook workbook, String directoryPath, String fileName) {
+        String filePath = directoryPath + "/" + fileName;
+        try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+            workbook.write(fileOut);
+        } catch (IOException e) {
+            log.error("文件保存失败 | 路径: {} | 错误: {}", filePath, e.getMessage(), e);
+        }
+    }
+
+
     private void generateGateWayPerformanceCurveChart(LocalDate endDate, String directoryPath) throws UnsupportedEncodingException {
         LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
         XSSFWorkbook gateWayPerformanceCurveChart = analysisService.getGateWayPerformanceCurveChart(startDateForMonthPerformanceTrend);
         String fileName = URLEncoder.encode("gatewayPerformanceChangeCurveGraph.xlsx", StandardCharsets.UTF_8.toString());
-        String filePath = directoryPath + "/" + fileName;
-        /* 执行文件写入操作 */
-        try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
-            gateWayPerformanceCurveChart.write(fileOut);
-        } catch (IOException e) {
-            log.error("ReportGenerationService#generateGateWayPerformanceCurveChart,出现异常！", e);
-        }
+        saveWorkbookToFile(gateWayPerformanceCurveChart, directoryPath, fileName);
     }
 
     private void generateWord(LocalDate startDate, LocalDate endDate, PerformanceResult result, String directoryPath) throws IOException {
         // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
             setWordStyle(document);
+
+            // jungo TODO 2025/3/12:
+            // setCatalog(document);
 
             // 第一部分：网关性能监控
             setFirstLevelTitle(document, "一、网关性能监控");
@@ -155,6 +183,10 @@ public class ReportGenerationService {
                 document.write(out);
             }
         }
+    }
+
+    private void setCatalog(XWPFDocument document) {
+
     }
 
     // 新增章节生成器
