@@ -118,50 +118,51 @@ public class ReportGenerationService {
         try (XWPFDocument document = new XWPFDocument()) {
             setWordStyle(document);
 
+            setFirstLevelTitle(document, "一、网关性能监控");
             /*cl-gateway 月平均慢请求率*/
-            setFirstLevelTitle(document, "cl-gateway 月平均慢请求率");
+            setSecondLevelTitle(document, "1.1 cl-gateway 月平均慢请求率");
             drawGatewayMonthlyAverageSlowRequestRateTable(document, result.getGatewayAverageSlowRequestRate());
 
             /*周大盘数据数据情况*/
             String startDateStr = DateUtils.getDateString(startDate, YYYY_MM_DD);
             String endDateStr = DateUtils.getDateString(endDate, YYYY_MM_DD);
-            setFirstLevelTitle(document, startDateStr + "~" + endDateStr + " 大盘数据数据情况");
+            setSecondLevelTitle(document, "1.2 " + startDateStr + "~" + endDateStr + " 大盘数据数据情况");
             drawWeeklyMarketDataSituationTable(document, result.getWeeklyMarketDataSituationData());
             setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
 
             /*月99线趋势*/
             LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
-            setFirstLevelTitle(document, startDateForMonthPerformanceTrend + "~" + endDateStr + " 99线趋势");
+            setSecondLevelTitle(document, "1.3 " + startDateForMonthPerformanceTrend + "~" + endDateStr + " 99线趋势");
             insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false);
             // jungo TODO 2025/3/10:补充图片
 
             /*月慢请求率趋势*/
-            setFirstLevelTitle(document, startDateForMonthPerformanceTrend + "~" + endDateStr + " 慢请求率趋势");
+            setSecondLevelTitle(document, "1.4 " + startDateForMonthPerformanceTrend + "~" + endDateStr + " 慢请求率趋势");
             insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true);
             // jungo TODO 2025/3/10:补充图片
 
             /*2025年周维度99线趋势*/
             int year = LocalDate.now().getYear();
-            setFirstLevelTitle(document, year + "年周维度99线趋势");
+            setSecondLevelTitle(document, "1.5 " + year + "年周维度99线趋势");
             // jungo TODO 2025/3/10:补充图片
 
             /* 2025年周维度慢请求率趋势*/
-            setFirstLevelTitle(document, year + "年周维度慢请求率趋势");
+            setSecondLevelTitle(document, "1.6 " + year + "年周维度慢请求率趋势");
             // jungo TODO 2025/3/10:补充图片
 
             /*核心接口监控接口*/
-            setFirstLevelTitle(document, "核心接口监控接口");
-            setSecondLevelTitle(document, "一、关键路径");
+            setFirstLevelTitle(document, "二、核心接口监控接口");
+            setSecondLevelTitle(document, "1.1 关键路径");
             drawCriticalPathTable(document, result.getCriticalLinkUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "二、五大金刚");
+            setSecondLevelTitle(document, "1.2 五大金刚");
             drawTheFiveGreatVajrasTable(document, result.getFiveGangJingUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "三、首屏TAB");
+            setSecondLevelTitle(document, "1.3 首屏TAB");
             drawFirstScreenTabTable(document, result.getFirstScreenTabUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "四、活动页关键组件（麒麟组件接口）");
+            setSecondLevelTitle(document, "1.4 活动页关键组件（麒麟组件接口）");
             drawQilinComponentInterfaceTable(document, result.getQilinComponentInterfaceUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "五、其他核心业务接口");
+            setSecondLevelTitle(document, "1.5 其他核心业务接口");
             drawOtherCoreBusinessInterfaceTable(document, result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "六、请求量TOP接口");
+            setSecondLevelTitle(document, "1.6 请求量TOP接口");
             drawRequestVolumeTopInterfaceTable(document, result.getAccessVolumeTop30Interface(), startDate, endDate);
             // jungo TODO 2025/3/12:结论
 
@@ -184,8 +185,6 @@ public class ReportGenerationService {
         // 创建图表段落
         XWPFParagraph p = doc.createParagraph();
         XWPFRun r = p.createRun();
-        // 图表标题占位文本
-        r.setText(title);
         r.addBreak();
 
         // 创建图表
