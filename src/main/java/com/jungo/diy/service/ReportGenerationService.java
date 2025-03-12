@@ -3,7 +3,6 @@ package com.jungo.diy.service;
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.model.PerformanceResult;
 import com.jungo.diy.model.SlowRequestRateModel;
-import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.TableUtils;
@@ -11,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.Units;
 import org.apache.poi.xddf.usermodel.chart.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlException;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
@@ -76,8 +76,6 @@ public class ReportGenerationService {
             log.error("WordDocumentGenerator#static initializer,出现异常！", e);
         }
     }
-    @Autowired
-    private PerformanceRepository performanceRepository;
 
     @Autowired
     private AnalysisService analysisService;
@@ -94,7 +92,28 @@ public class ReportGenerationService {
         }
 
         PerformanceResult result = analysisService.getPerformanceResult(startDate, endDate);
+        // 生成网关性能变化曲线图
+        generateGateWayPerformanceCurveChart(endDate, directoryPath);
+        // 生成word文档
+        generateWord(startDate, endDate, result, directoryPath);
 
+        return directoryPath;
+    }
+
+    private void generateGateWayPerformanceCurveChart(LocalDate endDate, String directoryPath) throws UnsupportedEncodingException {
+        LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
+        XSSFWorkbook gateWayPerformanceCurveChart = analysisService.getGateWayPerformanceCurveChart(startDateForMonthPerformanceTrend);
+        String fileName = URLEncoder.encode("gatewayPerformanceChangeCurveGraph.xlsx", StandardCharsets.UTF_8.toString());
+        String filePath = directoryPath + "/" + fileName;
+        /* 执行文件写入操作 */
+        try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+            gateWayPerformanceCurveChart.write(fileOut);
+        } catch (IOException e) {
+            log.error("ReportGenerationService#generateGateWayPerformanceCurveChart,出现异常！", e);
+        }
+    }
+
+    private void generateWord(LocalDate startDate, LocalDate endDate, PerformanceResult result, String directoryPath) throws IOException {
         // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
             setWordStyle(document);
@@ -111,13 +130,13 @@ public class ReportGenerationService {
             setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
 
             /*月99线趋势*/
-            LocalDate startDateForMonthSlowRequestRateTrend = endDate.minusDays(30);
-            setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 99线趋势");
+            LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
+            setFirstLevelTitle(document, startDateForMonthPerformanceTrend + "~" + endDateStr + " 99线趋势");
             insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false);
             // jungo TODO 2025/3/10:补充图片
 
             /*月慢请求率趋势*/
-            setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
+            setFirstLevelTitle(document, startDateForMonthPerformanceTrend + "~" + endDateStr + " 慢请求率趋势");
             insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true);
             // jungo TODO 2025/3/10:补充图片
 
@@ -144,6 +163,7 @@ public class ReportGenerationService {
             drawOtherCoreBusinessInterfaceTable(document, result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(), startDate, endDate);
             setSecondLevelTitle(document, "六、请求量TOP接口");
             drawRequestVolumeTopInterfaceTable(document, result.getAccessVolumeTop30Interface(), startDate, endDate);
+            // jungo TODO 2025/3/12:结论
 
             // 保存文档
             String fileName = URLEncoder.encode(  "performance.docx", StandardCharsets.UTF_8.toString());
@@ -152,8 +172,6 @@ public class ReportGenerationService {
                 document.write(out);
             }
         }
-
-        return directoryPath;
     }
 
     // 新增POI图表插入方法

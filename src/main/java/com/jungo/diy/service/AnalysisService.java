@@ -305,6 +305,20 @@ public class AnalysisService {
 
     }
 
+    public XSSFWorkbook getGateWayPerformanceCurveChart(LocalDate startDate) {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        // 定义 Sheet 名称和数据列表
+        String[] sheetNames = {"月-99线", "月-慢请求率", "周维度99线", "周维度慢请求率"};
+        int year = LocalDate.now().getYear();
+        TableData result = getTableData(year, startDate);
+        /* 生成包含不同指标的工作表 */
+        createP99ModelSheet(workbook, sheetNames[0], result.monthP99Models, "gateway 99线", "日期", "99线", "99线");
+        createSlowRequestRateModelSheet(workbook, sheetNames[1], result.monthSlowRequestRateModels, "gateway 慢请求率", "日期", "慢请求率", "慢请求率");
+        createP99ModelSheet(workbook, sheetNames[2], result.averageP99Models, "gateway 99线-周维度", "日期", "99线", "99线");
+        createSlowRequestRateModelSheet(workbook, sheetNames[3], result.averageSlowRequestRateModels, "gateway 慢请求率-周维度", "日期", "慢请求率", "慢请求率");
+        return workbook;
+    }
+
     private TableData getTableData(Integer year, LocalDate startDate) {
         /* 获取指定年份网关性能数据并排序 */
         LocalDate date = LocalDate.of(year, 1, 1);
