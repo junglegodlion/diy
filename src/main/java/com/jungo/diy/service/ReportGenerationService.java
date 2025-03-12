@@ -25,7 +25,6 @@ import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiConsumer;
 
@@ -37,7 +36,7 @@ import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
  */
 @Service
 @Slf4j
-public class WordDocumentGenerator {
+public class ReportGenerationService {
 
     // 新增常量类定义列索引（避免硬编码）
     private static class TableColumns {
@@ -70,7 +69,7 @@ public class WordDocumentGenerator {
         try {
             // 读取模板文档
             // 读取resources的文件
-            template = new XWPFDocument(Objects.requireNonNull(WordDocumentGenerator.class.getResourceAsStream("/format.docx")));
+            template = new XWPFDocument(Objects.requireNonNull(ReportGenerationService.class.getResourceAsStream("/format.docx")));
             // 获得模板文档的整体样式
             wordStyles = template.getStyle();
         } catch (IOException | XmlException e) {
@@ -93,18 +92,6 @@ public class WordDocumentGenerator {
             // 创建所有必要的目录
             directory.mkdirs();
         }
-        /*获取表格数据*/
-        // 月平均慢请求率
-        List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
-        // 获取周大盘数据数据情况
-        List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationTable(startDate, endDate);
-        // weeklyMarketDataSituationData的平均值
-        double averageSlowRequestRateInThePastWeek = weeklyMarketDataSituationData.stream().mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate).average().orElse(0.0);
-
-        /*月慢请求率趋势数据*/
-        // endDate前30天
-        LocalDate startDateForMonthSlowRequestRateTrend = endDate.minusDays(30);
-        List<GateWayDailyPerformanceEntity> monthlySlowRequestRateTrendData = performanceRepository.getMonthlySlowRequestRateTrendData(startDateForMonthSlowRequestRateTrend, endDate);
 
         PerformanceResult result = analysisService.getPerformanceResult(startDate, endDate);
 
@@ -114,23 +101,24 @@ public class WordDocumentGenerator {
 
             /*cl-gateway 月平均慢请求率*/
             setFirstLevelTitle(document, "cl-gateway 月平均慢请求率");
-            drawGatewayMonthlyAverageSlowRequestRateTable(document, gatewayAverageSlowRequestRate);
+            drawGatewayMonthlyAverageSlowRequestRateTable(document, result.getGatewayAverageSlowRequestRate());
 
             /*周大盘数据数据情况*/
             String startDateStr = DateUtils.getDateString(startDate, YYYY_MM_DD);
             String endDateStr = DateUtils.getDateString(endDate, YYYY_MM_DD);
             setFirstLevelTitle(document, startDateStr + "~" + endDateStr + " 大盘数据数据情况");
-            drawWeeklyMarketDataSituationTable(document, weeklyMarketDataSituationData);
-            setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(averageSlowRequestRateInThePastWeek));
+            drawWeeklyMarketDataSituationTable(document, result.getWeeklyMarketDataSituationData());
+            setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
 
             /*月99线趋势*/
+            LocalDate startDateForMonthSlowRequestRateTrend = endDate.minusDays(30);
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 99线趋势");
-            insertLineChart(document, monthlySlowRequestRateTrendData, "99线趋势", "日期", "毫秒", false);
+            insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false);
             // jungo TODO 2025/3/10:补充图片
 
             /*月慢请求率趋势*/
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
-            insertLineChart(document, monthlySlowRequestRateTrendData, "慢请求率趋势", "日期", "百分比", true);
+            insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true);
             // jungo TODO 2025/3/10:补充图片
 
             /*2025年周维度99线趋势*/
@@ -442,7 +430,7 @@ public class WordDocumentGenerator {
         XWPFParagraph imageParagraph = document.createParagraph();
         imageParagraph.setAlignment(ParagraphAlignment.CENTER);
         XWPFRun imageRun = imageParagraph.createRun();
-        try (InputStream inputStream = WordDocumentGenerator.class.getResourceAsStream("/images/img.png")) {
+        try (InputStream inputStream = ReportGenerationService.class.getResourceAsStream("/images/img.png")) {
             if (inputStream == null) {
                 throw new IOException("图片资源未找到：/images/img.png");
             }

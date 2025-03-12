@@ -141,6 +141,7 @@ public class AnalysisService {
     }
 
     public PerformanceResult getPerformanceResult(LocalDate startDate, LocalDate endDate) {
+
         Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
         // 关键链路
         List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
@@ -173,7 +174,33 @@ public class AnalysisService {
                 })
                 .map(urlPerformanceModel -> getUrlPerformanceResponse(urlPerformanceModel.getUrl(), urlPerformanceModelMap))
                 .collect(Collectors.toList());
-        return new PerformanceResult(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses, firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses, otherCoreBusinessInterfaceUrlPerformanceResponses, accessVolumeTop30Interface);
+
+        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        // 月平均慢请求率
+        List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
+        // 获取周大盘数据数据情况
+        List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationTable(startDate, endDate);
+        // weeklyMarketDataSituationData的平均值
+        double averageSlowRequestRateInThePastWeek = weeklyMarketDataSituationData.stream().mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate).average().orElse(0.0);
+        LocalDate startDateForMonthSlowRequestRateTrend = endDate.minusDays(30);
+        List<GateWayDailyPerformanceEntity> monthlySlowRequestRateTrendData = performanceRepository.getMonthlySlowRequestRateTrendData(startDateForMonthSlowRequestRateTrend, endDate);
+
+
+        return PerformanceResult.builder()
+                .gatewayAverageSlowRequestRate(gatewayAverageSlowRequestRate)
+                .averageSlowRequestRateInThePastWeek(averageSlowRequestRateInThePastWeek)
+                .weeklyMarketDataSituationData(weeklyMarketDataSituationData)
+                .monthlySlowRequestRateTrendData(monthlySlowRequestRateTrendData)
+                .criticalLinkUrlPerformanceResponses(criticalLinkUrlPerformanceResponses)
+                .fiveGangJingUrlPerformanceResponses(fiveGangJingUrlPerformanceResponses)
+                .firstScreenTabUrlPerformanceResponses(firstScreenTabUrlPerformanceResponses)
+                .qilinComponentInterfaceUrlPerformanceResponses(qilinComponentInterfaceUrlPerformanceResponses)
+                .otherCoreBusinessInterfaceUrlPerformanceResponses(otherCoreBusinessInterfaceUrlPerformanceResponses)
+                .accessVolumeTop30Interface(accessVolumeTop30Interface)
+                .build();
+
+
     }
 
     private static UrlPerformanceResponse getUrlPerformanceResponse(String url,
