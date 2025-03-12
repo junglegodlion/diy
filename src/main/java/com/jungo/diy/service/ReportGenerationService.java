@@ -6,6 +6,7 @@ import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.TableUtils;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.Units;
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static com.jungo.diy.util.DateUtils.MM_DD;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
@@ -118,52 +120,32 @@ public class ReportGenerationService {
         try (XWPFDocument document = new XWPFDocument()) {
             setWordStyle(document);
 
+            // 第一部分：网关性能监控
             setFirstLevelTitle(document, "一、网关性能监控");
-            /*cl-gateway 月平均慢请求率*/
-            setSecondLevelTitle(document, "1.1 cl-gateway 月平均慢请求率");
-            drawGatewayMonthlyAverageSlowRequestRateTable(document, result.getGatewayAverageSlowRequestRate());
+            List<Section> sections = Arrays.asList(
+                    new Section("cl-gateway 月平均慢请求率",
+                            d -> drawGatewayMonthlyAverageSlowRequestRateTable(d, result.getGatewayAverageSlowRequestRate())),
+                    new Section(startDate, endDate, "大盘数据数据情况",
+                            d -> {
+                                drawWeeklyMarketDataSituationTable(d, result.getWeeklyMarketDataSituationData());
+                                setText(d, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
+                            }),
+                    new Section(endDate.minusDays(30), endDate, "99线趋势",
+                            d -> insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false)),
+                    new Section(endDate.minusDays(30), endDate, "慢请求率趋势",
+                            d -> insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true)),
+                    new Section(LocalDate.now().getYear() + "年周维度99线趋势",
+                            d -> {/* 图片插入逻辑 */}),
+                    new Section(LocalDate.now().getYear() + "年周维度慢请求率趋势",
+                            d -> {/* 图片插入逻辑 */})
+            );
 
-            /*周大盘数据数据情况*/
-            String startDateStr = DateUtils.getDateString(startDate, YYYY_MM_DD);
-            String endDateStr = DateUtils.getDateString(endDate, YYYY_MM_DD);
-            setSecondLevelTitle(document, "1.2 " + startDateStr + "~" + endDateStr + " 大盘数据数据情况");
-            drawWeeklyMarketDataSituationTable(document, result.getWeeklyMarketDataSituationData());
-            setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
+            // 统一生成章节
+            generateSections(document, sections, 1);
 
-            /*月99线趋势*/
-            LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
-            setSecondLevelTitle(document, "1.3 " + startDateForMonthPerformanceTrend + "~" + endDateStr + " 99线趋势");
-            insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false);
-            // jungo TODO 2025/3/10:补充图片
-
-            /*月慢请求率趋势*/
-            setSecondLevelTitle(document, "1.4 " + startDateForMonthPerformanceTrend + "~" + endDateStr + " 慢请求率趋势");
-            insertLineChart(document, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true);
-            // jungo TODO 2025/3/10:补充图片
-
-            /*2025年周维度99线趋势*/
-            int year = LocalDate.now().getYear();
-            setSecondLevelTitle(document, "1.5 " + year + "年周维度99线趋势");
-            // jungo TODO 2025/3/10:补充图片
-
-            /* 2025年周维度慢请求率趋势*/
-            setSecondLevelTitle(document, "1.6 " + year + "年周维度慢请求率趋势");
-            // jungo TODO 2025/3/10:补充图片
-
-            /*核心接口监控接口*/
+            // 第二部分：核心接口监控
             setFirstLevelTitle(document, "二、核心接口监控接口");
-            setSecondLevelTitle(document, "1.1 关键路径");
-            drawCriticalPathTable(document, result.getCriticalLinkUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "1.2 五大金刚");
-            drawTheFiveGreatVajrasTable(document, result.getFiveGangJingUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "1.3 首屏TAB");
-            drawFirstScreenTabTable(document, result.getFirstScreenTabUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "1.4 活动页关键组件（麒麟组件接口）");
-            drawQilinComponentInterfaceTable(document, result.getQilinComponentInterfaceUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "1.5 其他核心业务接口");
-            drawOtherCoreBusinessInterfaceTable(document, result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(), startDate, endDate);
-            setSecondLevelTitle(document, "1.6 请求量TOP接口");
-            drawRequestVolumeTopInterfaceTable(document, result.getAccessVolumeTop30Interface(), startDate, endDate);
+            generateCoreSections(document, result, startDate, endDate);
             // jungo TODO 2025/3/12:结论
 
             // 保存文档
@@ -175,6 +157,86 @@ public class ReportGenerationService {
         }
     }
 
+    // 新增章节生成器
+    private void generateSections(XWPFDocument doc, List<Section> sections, int chapter) {
+        int index = 1;
+        for (Section section : sections) {
+            setSecondLevelTitle(doc, chapter + "." + index + " " + section.getTitle());
+            section.execute(doc);
+            index++;
+        }
+    }
+
+
+    // 核心接口章节生成
+    private void generateCoreSections(XWPFDocument doc, PerformanceResult result, LocalDate start, LocalDate end) {
+        List<BiConsumer<XWPFDocument, PerformanceResult>> coreSections = Arrays.asList(
+                (d, r) -> drawCriticalPathTable(d, r.getCriticalLinkUrlPerformanceResponses(), start, end),
+                (d, r) -> drawTheFiveGreatVajrasTable(d, r.getFiveGangJingUrlPerformanceResponses(), start, end),
+                (d, r) -> drawFirstScreenTabTable(d, r.getFirstScreenTabUrlPerformanceResponses(), start, end),
+                (d, r) -> drawQilinComponentInterfaceTable(d, r.getQilinComponentInterfaceUrlPerformanceResponses(), start, end),
+                (d, r) -> drawOtherCoreBusinessInterfaceTable(d, r.getOtherCoreBusinessInterfaceUrlPerformanceResponses(), start, end),
+                (d, r) -> drawRequestVolumeTopInterfaceTable(d, r.getAccessVolumeTop30Interface(), start, end)
+        );
+
+        int index = 1;
+        for (BiConsumer<XWPFDocument, PerformanceResult> section : coreSections) {
+            setSecondLevelTitle(doc, "2." + index + " " + getCoreSectionTitle(index));
+            section.accept(doc, result);
+            index++;
+        }
+    }
+
+    // 新增章节标题映射
+    private String getCoreSectionTitle(int index) {
+        switch (index) {
+            case 1:
+                return "关键路径";
+            case 2:
+                return "五大金刚";
+            case 3:
+                return "首屏TAB";
+            case 4:
+                return "活动页关键组件（麒麟组件接口）";
+            case 5:
+                return "其他核心业务接口";
+            case 6:
+                return "请求量TOP接口";
+            default:
+                return "";
+        }
+    }
+
+    // 新增章节数据类
+    @Data
+    private static class Section {
+        private String title;
+        private Consumer<XWPFDocument> action;
+        private LocalDate start;
+        private LocalDate end;
+
+        public Section(String title, LocalDate start, LocalDate end, Consumer<XWPFDocument> action) {
+            this.title = title;
+            this.action = action;
+            this.start = start;
+            this.end = end;
+        }
+
+        Section(String title, Consumer<XWPFDocument> action) {
+            this(title, null, null, action);
+        }
+
+        Section(LocalDate start, LocalDate end, String title, Consumer<XWPFDocument> action) {
+            this(title, start, end, action);
+        }
+
+        // 执行章节生成逻辑
+        void execute(XWPFDocument doc) {
+            this.action.accept(doc);
+        }
+
+        // ... 其他辅助方法 ...
+    }
     // 新增POI图表插入方法
     private void insertLineChart(XWPFDocument doc,
                                  List<GateWayDailyPerformanceEntity> data,
