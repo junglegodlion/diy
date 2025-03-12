@@ -27,6 +27,8 @@ import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.Month;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -174,8 +176,56 @@ public class ReportGenerationService {
             // 第二部分：核心接口监控
             setFirstLevelTitle(document, "二、核心接口监控接口");
             generateCoreSections(document, result, startDate, endDate);
-            // jungo TODO 2025/3/12:结论
 
+            // 第三部分：结论
+            setFirstLevelTitle(document, "三、结论");
+
+            int monthValue = LocalDate.now().getMonthValue();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("M.d");
+            String dateRange = startDate.format(formatter)  + "~" + endDate.format(formatter);
+
+            StringBuilder str = new StringBuilder("一、核心接口（关键路径）需重点关注：");
+            str.append(endDate.format(formatter)).append("日\n");
+
+            List<UrlPerformanceResponse> dataList = result.getCriticalLinkUrlPerformanceResponses();
+            // 取出dataList不达标的数据
+            for (UrlPerformanceResponse urlPerformanceResponse : dataList) {
+                if (!urlPerformanceResponse.getReachTarget()) {
+                    str.append("【").append(urlPerformanceResponse.getPageName()).append("】").append(urlPerformanceResponse.getUrl()).append("\n").append(" 99线：").append(urlPerformanceResponse.getThisWeekP99()).append("ms 99线基线目标：").append(urlPerformanceResponse.getP99Target()).append("ms  @").append(urlPerformanceResponse.getOwner()).append("\n");
+                }
+            }
+
+            str.append("二、其他性能恶化的接口（").append(dateRange).append("对比，99 线增加超 30ms，且环比增幅超 10%）：\n");
+
+
+            List<UrlPerformanceResponse>[] dataLists = new List[] {
+                    result.getFiveGangJingUrlPerformanceResponses(),
+                    result.getFirstScreenTabUrlPerformanceResponses(),
+                    result.getQilinComponentInterfaceUrlPerformanceResponses(),
+                    result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(),
+                    result.getAccessVolumeTop30Interface()
+            };
+            for (int i = 1; i < dataLists.length; i++) {
+                List<UrlPerformanceResponse> performanceResponses = dataLists[i];
+                // 取出dataList不达标的数据【轮胎列表主接口】/cl-tire-site/tireList/getCombineList 99线变化：+94ms  @平会
+                for (UrlPerformanceResponse urlPerformanceResponse : performanceResponses) {
+                    if (!urlPerformanceResponse.getReachTarget()) {
+                        str.append("【").append(urlPerformanceResponse.getPageName()).append("】").append(urlPerformanceResponse.getUrl()).append("\n").append(" 99线变化：").append(urlPerformanceResponse.getP99Change()).append("ms  @").append(urlPerformanceResponse.getOwner()).append("\n");
+                    }
+                }
+
+            }
+            // 生成完整文案
+
+            String report = "@所有人\n" +
+                    + monthValue + "月慢请求率概况：\n" +
+                    "--月均值：6.88%\n" +
+                    "--本周（" + dateRange + "）大盘均值：6.93%\n" +
+                    str +
+                    "请以上接口负责人提供性能恶化的原因，并推进相关治理措施。\n" +
+                    "本周数据明细详见 ：https://wiki.tuhu.cn/pages/viewpage.action?pageId=587414655";
+
+            setText(document, report);
             // 保存文档
             String fileName = URLEncoder.encode(  "performance.docx", StandardCharsets.UTF_8.toString());
             String filePath = directoryPath + "/" + fileName;
@@ -566,11 +616,18 @@ public class ReportGenerationService {
     }
 
     private static void setText(XWPFDocument document, String text) {
-        // 创建段落
         XWPFParagraph paragraph = document.createParagraph();
-        // 创建文本运行
         XWPFRun run = paragraph.createRun();
-        run.setText(text);
+
+        // 按换行符分割文本
+        String[] lines = text.split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            run.setText(lines[i]);
+            if (i < lines.length - 1) {
+                run.addBreak(); // 添加换行符（同段落内换行）
+                // 或用 run.addBreak(BreakType.TEXT_WRAPPING);
+            }
+        }
     }
 
     private static void setTitle(XWPFDocument document, String title, String style, int fontSize) {
