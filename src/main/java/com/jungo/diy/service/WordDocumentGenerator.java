@@ -86,8 +86,7 @@ public class WordDocumentGenerator {
     public String generateWordDocument(LocalDate startDate, LocalDate endDate) throws IOException, InvalidFormatException {
         // 新建目录，将文件保存在改目录下
         LocalDate currentDate = LocalDate.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        String formattedDate = currentDate.format(formatter);
+        String formattedDate = DateUtils.getDateString(currentDate, YYYY_MM_DD);
         String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/" + formattedDate;
         File directory = new File(directoryPath);
         if (!directory.exists()) {
@@ -124,15 +123,14 @@ public class WordDocumentGenerator {
             drawWeeklyMarketDataSituationTable(document, weeklyMarketDataSituationData);
             setText(document, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(averageSlowRequestRateInThePastWeek));
 
-            /*月慢请求率趋势*/
-            setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
-            // 生成折线图
-            insertLineChart(document, monthlySlowRequestRateTrendData, "慢请求率趋势", "日期", "百分比", true);
-            // jungo TODO 2025/3/10:补充图片
-
             /*月99线趋势*/
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 99线趋势");
             insertLineChart(document, monthlySlowRequestRateTrendData, "99线趋势", "日期", "毫秒", false);
+            // jungo TODO 2025/3/10:补充图片
+
+            /*月慢请求率趋势*/
+            setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
+            insertLineChart(document, monthlySlowRequestRateTrendData, "慢请求率趋势", "日期", "百分比", true);
             // jungo TODO 2025/3/10:补充图片
 
             /*2025年周维度99线趋势*/
@@ -166,8 +164,6 @@ public class WordDocumentGenerator {
                 document.write(out);
             }
         }
-
-
 
         return directoryPath;
     }
