@@ -1,10 +1,8 @@
 package com.jungo.diy.service;
 
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
-import com.jungo.diy.enums.InterfaceTypeEnum;
 import com.jungo.diy.model.PerformanceResult;
 import com.jungo.diy.model.SlowRequestRateModel;
-import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.DateUtils;
@@ -15,28 +13,21 @@ import org.apache.poi.util.Units;
 import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlException;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartUtils;
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.data.category.DefaultCategoryDataset;
-import org.openxmlformats.schemas.drawingml.x2006.chart.CTChart;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
 import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyles;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblBorders;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.jungo.diy.util.DateUtils.MM_DD;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
@@ -92,9 +83,17 @@ public class WordDocumentGenerator {
     @Autowired
     private AnalysisService analysisService;
 
-    public void generateWordDocument(String filePath,
-                                     LocalDate startDate,
-                                     LocalDate endDate) throws IOException, InvalidFormatException {
+    public String generateWordDocument(LocalDate startDate, LocalDate endDate) throws IOException, InvalidFormatException {
+        // 新建目录，将文件保存在改目录下
+        LocalDate currentDate = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        String formattedDate = currentDate.format(formatter);
+        String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/" + formattedDate;
+        File directory = new File(directoryPath);
+        if (!directory.exists()) {
+            // 创建所有必要的目录
+            directory.mkdirs();
+        }
         /*获取表格数据*/
         // 月平均慢请求率
         List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
@@ -129,9 +128,7 @@ public class WordDocumentGenerator {
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 慢请求率趋势");
             // 生成折线图
             insertLineChart(document, monthlySlowRequestRateTrendData, "慢请求率趋势", "日期", "百分比", true);
-
             // jungo TODO 2025/3/10:补充图片
-
 
             /*月99线趋势*/
             setFirstLevelTitle(document, startDateForMonthSlowRequestRateTrend + "~" + endDateStr + " 99线趋势");
@@ -162,8 +159,9 @@ public class WordDocumentGenerator {
             setSecondLevelTitle(document, "六、请求量TOP接口");
             drawRequestVolumeTopInterfaceTable(document, result.getAccessVolumeTop30Interface(), startDate, endDate);
 
-            setImage(document);
             // 保存文档
+            String fileName = URLEncoder.encode(  "performance.docx", StandardCharsets.UTF_8.toString());
+            String filePath = directoryPath + "/" + fileName;
             try (FileOutputStream out = new FileOutputStream(filePath)) {
                 document.write(out);
             }
@@ -171,6 +169,7 @@ public class WordDocumentGenerator {
 
 
 
+        return directoryPath;
     }
 
     // 新增POI图表插入方法

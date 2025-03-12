@@ -1,6 +1,7 @@
 package com.jungo.diy.controller;
 
 import com.jungo.diy.service.WordDocumentGenerator;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
  * @author lichuang3
  */
 @RestController
+@Slf4j
 public class WordController {
 
     @Autowired
@@ -21,12 +23,11 @@ public class WordController {
     @GetMapping("/generate-word")
     public String generateWord(@RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
                                @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
-        String filePath = "C:\\Users\\lichuang3\\Desktop\\test.docx";
         try {
-            WordDocumentGenerator.generateWordDocument(filePath, startDate, endDate);
+            String filePath = WordDocumentGenerator.generateWordDocument(startDate, endDate);
             return "Word文档生成成功，路径：" + filePath;
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("WordController#generateWord,出现异常！", e);
             return "Word文档生成失败：" + e.getMessage();
         } catch (InvalidFormatException e) {
             throw new RuntimeException(e);
