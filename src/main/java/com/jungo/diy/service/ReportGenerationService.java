@@ -205,8 +205,7 @@ public class ReportGenerationService {
                     result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(),
                     result.getAccessVolumeTop30Interface()
             };
-            for (int i = 1; i < dataLists.length; i++) {
-                List<UrlPerformanceResponse> performanceResponses = dataLists[i];
+            for (List<UrlPerformanceResponse> performanceResponses : dataLists) {
                 // 取出dataList不达标的数据【轮胎列表主接口】/cl-tire-site/tireList/getCombineList 99线变化：+94ms  @平会
                 for (UrlPerformanceResponse urlPerformanceResponse : performanceResponses) {
                     if (!urlPerformanceResponse.getReachTarget()) {
@@ -401,7 +400,7 @@ public class ReportGenerationService {
                                                     List<UrlPerformanceResponse> responses,
                                                     LocalDate startDate,
                                                     LocalDate endDate) {
-        drawCommonTable(document, responses, startDate, endDate, false);
+        drawCommonTable(document, responses, startDate, endDate, true);
     }
 
     private void drawOtherCoreBusinessInterfaceTable(XWPFDocument document,
@@ -410,7 +409,7 @@ public class ReportGenerationService {
                                                      LocalDate endDate) {
 
 
-        drawCommonTable(document, responses, startDate, endDate, false);
+        drawCommonTable(document, responses, startDate, endDate, true);
     }
 
     private void drawQilinComponentInterfaceTable(XWPFDocument document,
@@ -419,14 +418,14 @@ public class ReportGenerationService {
                                                   LocalDate endDate) {
 
 
-        drawCommonTable(document, responses, startDate, endDate, false);
+        drawCommonTable(document, responses, startDate, endDate, true);
     }
 
     private void drawFirstScreenTabTable(XWPFDocument document,
                                          List<UrlPerformanceResponse> responses,
                                          LocalDate startDate,
                                          LocalDate endDate) {
-        drawCommonTable(document, responses, startDate, endDate, false);
+        drawCommonTable(document, responses, startDate, endDate, true);
 
     }
 
@@ -507,7 +506,7 @@ public class ReportGenerationService {
                                              List<UrlPerformanceResponse> responses,
                                              LocalDate startDate,
                                              LocalDate endDate) {
-        drawCommonTable(document, responses, startDate, endDate, false);
+        drawCommonTable(document, responses, startDate, endDate, true);
     }
 
     private void drawCriticalPathTable(XWPFDocument document,
