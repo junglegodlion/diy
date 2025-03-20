@@ -6,10 +6,32 @@
     <!-- 引入 Bootstrap -->
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f8f9fa;
+        }
+
         .container {
             max-width: 800px;
             margin: 20px auto;
             padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            margin-bottom: 30px;
+        }
+
+        .card-header {
+            font-size: 18px;
+            font-weight: bold;
         }
 
         .form-group {
@@ -19,12 +41,14 @@
         label {
             display: block;
             margin-bottom: 5px;
+            color: #6c757d;
         }
 
         input[type="date"], input[type="text"] {
             width: 100%;
-            padding: 8px;
+            padding: 10px;
             border: 1px solid #ddd;
+            border-radius: 4px;
         }
 
         button {
@@ -33,45 +57,34 @@
             border: none;
             padding: 10px 20px;
             cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .modal-content {
+            border-radius: 8px;
+        }
+
+        .file-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .table th, .table td {
+            vertical-align: middle;
+        }
+
+        .alert {
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h2>99线变化曲线生成</h2>
-    <form th:action="@{/analysis/get99LineCurve}" method="get" onsubmit="return validateDates()">
-        <div class="form-group">
-            <label>接口URL：</label>
-            <input type="text" name="url" required placeholder="请输入接口URL">
-        </div>
-
-        <div class="form-group">
-            <label>起始日期：</label>
-            <input type="date" name="startDate" required th:value="${#temporals.format(startDate, 'yyyy-MM-dd')}">
-        </div>
-
-        <div class="form-group">
-            <label>结束日期：</label>
-            <input type="date" name="endDate" required th:value="${#temporals.format(endDate, 'yyyy-MM-dd')}">
-        </div>
-
-        <button type="submit">生成曲线图</button>
-    </form>
-
-    <script>
-        function validateDates() {
-            const start = document.querySelector('input[name="startDate"]').value;
-            const end = document.querySelector('input[name="endDate"]').value;
-            if (new Date(end) < new Date(start)) {
-                alert("结束日期不能早于开始日期");
-                return false;
-            }
-            return true;
-        }
-    </script>
-</div>
-<div class="container mt-5">
-    <!-- 报告生成卡片 -->
     <h2>报告生成</h2>
     <div class="card shadow">
         <div class="card-header bg-primary text-white">
@@ -79,24 +92,7 @@
         </div>
 
         <div class="card-body">
-            <!-- 修改1：添加结果弹窗容器 -->
-            <div id="resultModal" class="modal fade">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">生成结果</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div id="resultContent"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 修改2：改造表单提交方式 -->
             <form id="wordForm" class="row g-3">
-                <!-- 开始日期 -->
                 <div class="col-md-6">
                     <label class="form-label">开始日期</label>
                     <input type="date"
@@ -106,7 +102,6 @@
                            required>
                 </div>
 
-                <!-- 结束日期 -->
                 <div class="col-md-6">
                     <label class="form-label">结束日期</label>
                     <input type="date"
@@ -116,7 +111,6 @@
                            required>
                 </div>
 
-                <!-- 提交按钮 -->
                 <div class="col-12">
                     <button type="button" class="btn btn-primary" onclick="generateWord()">
                         <i class="bi bi-file-earmark-word"></i> 生成文档
@@ -126,43 +120,6 @@
         </div>
     </div>
 
-    <script>
-        function generateWord() {
-            const formData = new FormData(document.getElementById('wordForm'));
-
-            // 使用Fetch API发送异步请求
-            fetch('/generate-word?' + new URLSearchParams(formData), {
-                method: 'GET'
-            })
-                .then(response => response.text())
-                .then(result => {
-                    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
-                    const content = document.getElementById('resultContent');
-
-                    // 处理成功/失败样式
-                    if (result.includes("成功")) {
-                        const filePath = result.split("路径：")[1];
-                        content.innerHTML = `
-                <div class="alert alert-success">
-                    ${result}
-                </div>
-            `;
-                    } else {
-                        content.innerHTML = `<div class="alert alert-danger">${result}</div>`;
-                    }
-
-                    modal.show();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('请求失败，请检查控制台日志');
-                });
-        }
-    </script>
-
-</div>
-<div class="container">
-    <!-- 目录查询卡片 -->
     <h2>上传数据到数据库</h2>
     <div class="card directory-card">
         <div class="card-header bg-primary text-white">
@@ -170,7 +127,6 @@
         </div>
 
         <div class="card-body">
-            <!-- 查询表单 -->
             <div class="input-group mb-4">
                 <input type="text"
                        id="directoryInput"
@@ -183,7 +139,6 @@
                 </button>
             </div>
 
-            <!-- 结果展示区域 -->
             <div id="resultPanel" style="display: none;">
                 <h6 class="text-muted mb-3">找到 <span id="fileCount" class="badge bg-info">0</span> 个文件</h6>
 
@@ -203,70 +158,104 @@
                 </div>
             </div>
 
-            <!-- 错误提示 -->
             <div id="errorAlert" class="alert alert-danger mt-3" style="display: none;"></div>
         </div>
     </div>
 </div>
 
-<script>function loadFiles() {
-    // const directory = document.getElementById('directoryInput').value;
-    // if (!directory) {
-    //     showError("请输入目录路径");
-    //     return;
-    // }
+<script>
+    function generateWord() {
+        const formData = new FormData(document.getElementById('wordForm'));
 
-    fetch(`/files?directoryName=${encodeURIComponent(directory)}`)
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            return response.json();
+        fetch('/generate-word?' + new URLSearchParams(formData), {
+            method: 'GET'
         })
-        .then(files => {
-            updateFileList(files);
-            showResultPanel();
-        })
-        .catch(error => {
-            showError(error.message.includes("404") ?
-                "目录不存在或无法访问" : "请求失败：" + error.message);
-        });
-}
+            .then(response => response.text())
+            .then(result => {
+                const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+                const content = document.getElementById('resultContent');
 
-function updateFileList(files) {
-    const tbody = document.getElementById('fileTableBody');
-    tbody.innerHTML = ''; // 清空旧数据
+                if (result.includes("成功")) {
+                    const filePath = result.split("路径：")[1];
+                    content.innerHTML = `
+                    <div class="alert alert-success">
+                        ${result}
+                    </div>
+                `;
+                } else {
+                    content.innerHTML = `<div class="alert alert-danger">${result}</div>`;
+                }
 
-    document.getElementById('fileCount').textContent = files.length;
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('请求失败，请检查控制台日志');
+            });
+    }
 
-    files.forEach(file => {
-        const row = `            <tr>
+    function loadFiles() {
+        const directory = document.getElementById('directoryInput').value;
+
+        if (!directory) {
+            showError("请输入目录路径");
+            return;
+        }
+
+        fetch(`/files?directoryName=${encodeURIComponent(directory)}`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(files => {
+                updateFileList(files);
+                showResultPanel();
+            })
+            .catch(error => {
+                showError(error.message.includes("404") ?
+                    "目录不存在或无法访问" : "请求失败：" + error.message);
+            });
+    }
+
+    function updateFileList(files) {
+        const tbody = document.getElementById('fileTableBody');
+        tbody.innerHTML = '';
+
+        document.getElementById('fileCount').textContent = files.length;
+
+        files.forEach(file => {
+            const row = `
+            <tr>
                 <td>${file.fileName}</td>
                 <td>${file.isDirectory ? '📁 目录' : '📄 文件'}</td>
                 <td>${formatFileSize(file.size)}</td>
             </tr>
         `;
-        tbody.insertAdjacentHTML('beforeend', row);
-    });
-}
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+    }
 
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
 
-function showResultPanel() {
-    document.getElementById('resultPanel').style.display = 'block';
-    document.getElementById('errorAlert').style.display = 'none';
-}
+    function showResultPanel() {
+        document.getElementById('resultPanel').style.display = 'block';
+        document.getElementById('errorAlert').style.display = 'none';
+    }
 
-function showError(message) {
-    document.getElementById('errorAlert').innerHTML = `        <strong>错误！</strong> ${message}        <button type="button" class="btn-close float-end" onclick="this.parentElement.style.display='none'"></button>
+    function showError(message) {
+        document.getElementById('errorAlert').innerHTML = `
+        <strong>错误！</strong> ${message}
+        <button type="button" class="btn-close float-end" onclick="this.parentElement.style.display='none'"></button>
     `;
-    document.getElementById('errorAlert').style.display = 'block';
-    document.getElementById('resultPanel').style.display = 'none';
-}
+        document.getElementById('errorAlert').style.display = 'block';
+        document.getElementById('resultPanel').style.display = 'none';
+    }
 </script>
 <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
 </body>
