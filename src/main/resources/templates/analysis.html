@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>接口性能分析</title>
+    <style>
+        .container { max-width: 800px; margin: 20px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input[type="date"], input[type="text"] { 
+            width: 100%; padding: 8px; border: 1px solid #ddd; 
+        }
+        button { 
+            background: #007bff; color: white; border: none; 
+            padding: 10px 20px; cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>99线变化曲线生成</h2>
+    <form th:action="@{/analysis/get99LineCurve}" method="get" onsubmit="return validateDates()">
+        <div class="form-group">
+            <label>接口URL：</label>
+            <input type="text" name="url" required placeholder="请输入接口URL">
+        </div>
+        
+        <div class="form-group">
+            <label>起始日期：</label>
+            <input type="date" name="startDate" required th:value="${#temporals.format(startDate, 'yyyy-MM-dd')}">
+        </div>
+
+        <div class="form-group">
+            <label>结束日期：</label>
+            <input type="date" name="endDate" required th:value="${#temporals.format(endDate, 'yyyy-MM-dd')}">
+        </div>
+
+        <button type="submit">生成曲线图</button>
+    </form>
+
+    <script>
+        function validateDates() {
+            const start = document.querySelector('input[name="startDate"]').value;
+            const end = document.querySelector('input[name="endDate"]').value;
+            if (new Date(end) < new Date(start)) {
+                alert("结束日期不能早于开始日期");
+                return false;
+            }
+            return true;
+        }
+    </script>
+</div>
+</body>
+</html>
