@@ -1,9 +1,13 @@
+
 package com.jungo.diy.controller;
 
 import com.jungo.diy.model.FileModel;
 import com.jungo.diy.model.FolderModel;
 import com.jungo.diy.service.ZipService;
 import com.jungo.diy.util.CsvUtils;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,14 +31,18 @@ import java.util.zip.ZipInputStream;
 /**
  * @author lichuang3
  */
+@Api(tags = "Zip控制器")
 @RestController
 public class ZipController {
 
-
     @Autowired
     ZipService zipService;
+
+    @ApiOperation(value = "按级别读取和处理ZIP文件，并可选择写入数据库", response = Void.class)
     @PostMapping("/read-level-zip")
-    public void readLevelZip(@RequestParam("file") MultipartFile file, @RequestParam("write2DB") Integer write2DB) throws IOException {
+    public void readLevelZip(
+            @ApiParam(value = "上传的ZIP文件", required = true) @RequestParam("file") MultipartFile file,
+            @ApiParam(value = "用于指示是否将处理后的数据写入数据库的标记（1表示是，0表示否）", required = true) @RequestParam("write2DB") Integer write2DB) throws IOException {
         // 创建临时文件并自动清理
         File tempFile = File.createTempFile("upload", ".zip");
         Map<String, FolderModel> folderModelMap = new java.util.HashMap<>();
@@ -62,7 +70,6 @@ public class ZipController {
 
     private void processDirectoryFiles(ZipFile zipFile, String dirPrefix, Integer write2DB, Map<String, FolderModel> folderModelMap) throws IOException {
         Enumeration<? extends ZipEntry> allEntries = zipFile.entries();
-
 
         while (allEntries.hasMoreElements()) {
             ZipEntry fileEntry = allEntries.nextElement();
@@ -103,15 +110,16 @@ public class ZipController {
         }
     }
 
-
     /**
      * 处理 ZIP 文件读取
      *
      * @param file 上传的 ZIP 文件
      * @return 解压结果信息
      */
+    @ApiOperation(value = "Process and read a ZIP file", response = String.class)
     @PostMapping("/read-zip")
-    public String readZip(@RequestParam("file") MultipartFile file) throws IOException {
+    public String readZip(
+            @ApiParam(value = "The uploaded ZIP file", required = true) @RequestParam("file") MultipartFile file) throws IOException {
         try (ZipInputStream zipInputStream = new ZipInputStream(file.getInputStream())) {
             processZipEntries(zipInputStream);
             return "Zip processed successfully";
@@ -165,8 +173,10 @@ public class ZipController {
      * @param file 上传的 ZIP 文件
      * @return 解压结果信息
      */
+    @ApiOperation(value = "Upload and unzip a ZIP file", response = ResponseEntity.class)
     @PostMapping("/upload-zip")
-    public ResponseEntity<String> handleZipUpload(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<String> handleZipUpload(
+            @ApiParam(value = "The uploaded ZIP file", required = true) @RequestParam("file") MultipartFile file) {
         try {
             // 检查文件是否为空
             if (file.isEmpty()) {

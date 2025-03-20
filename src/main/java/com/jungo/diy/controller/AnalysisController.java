@@ -27,7 +27,7 @@ import java.time.temporal.ChronoUnit;
 @RestController
 @Slf4j
 @RequestMapping("/analysis")
-@Api(tags = "Analysis Controller", description = "API for analysis operations")
+@Api(tags = "分析控制器", description = "API for analysis operations")
 public class AnalysisController {
 
     @Autowired
