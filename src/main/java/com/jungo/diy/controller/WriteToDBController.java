@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * @author lichuang3
  */
-@Api(value = "文件操作控制器")
+@Api(tags = "文件操作控制器")
 @RestController
 @RequestMapping("/files")
 public class WriteToDBController {

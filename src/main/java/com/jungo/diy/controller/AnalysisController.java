@@ -2,6 +2,7 @@
 package com.jungo.diy.controller;
 
 import com.jungo.diy.config.RequestContext;
+import com.jungo.diy.model.P99Model;
 import com.jungo.diy.service.AnalysisService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -19,6 +20,7 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.PastOrPresent;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 /**
  * @author lichuang3
@@ -50,7 +52,7 @@ public class AnalysisController {
     }
 
     /**
-     * 获取某一接口几号到几号的99线变化曲线
+     * 图-获取某一接口几号到几号的99线变化曲线
      *
      * @param url 接口URL
      * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
@@ -58,7 +60,7 @@ public class AnalysisController {
      * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
      */
     @GetMapping("/get99LineCurve")
-    @ApiOperation(value = "获取某一接口几号到几号的99线变化曲线", notes = "通过analysisService生成99线变化曲线图表后，直接通过response对象返回结果")
+    @ApiOperation(value = "图-获取某一接口几号到几号的99线变化曲线", notes = "通过analysisService生成99线变化曲线图表后，直接通过response对象返回结果")
     public String get99LineCurve(
             @ApiParam(value = "接口URL", required = true) @RequestParam("url") @NotBlank(message = "URL不能为空") String url,
             @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
@@ -70,13 +72,41 @@ public class AnalysisController {
         }
 
         // 写入上下文
-        RequestContext.put("startDate",  startDate);
-        RequestContext.put("endDate",  endDate);
+        RequestContext.put("startDate", startDate);
+        RequestContext.put("endDate", endDate);
 
         // 设置响应头
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment;filename=get99LineCurve_chart.xlsx");
         return analysisService.get99LineCurve(url, response);
+    }
+
+    /**
+     * 数据-获取某一接口几号到几号的99线变化曲线
+     *
+     * @param url 接口URL
+     * @param startDate 起始日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围起点
+     * @param endDate 结束日期（格式：yyyy-MM-dd），要求为当前或过去的日期，用于限定查询数据的时间范围终点
+     * @param response HTTP响应对象，用于直接向客户端输出图表数据（如图片流或文件下载）
+     */
+    @GetMapping("/get99LineData")
+    @ApiOperation(value = "数据-获取某一接口几号到几号的99线变化")
+    public List<P99Model> get99LineData(
+            @ApiParam(value = "接口URL", required = true) @RequestParam("url") @NotBlank(message = "URL不能为空") String url,
+            @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
+            @ApiParam(value = "结束日期（格式：yyyy-MM-dd）", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
+            HttpServletResponse response) {
+        // 日期范围校验
+        if (endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("结束日期不能早于开始日期");
+        }
+
+        // 写入上下文
+        RequestContext.put("startDate", startDate);
+        RequestContext.put("endDate", endDate);
+
+        // 设置响应头
+        return analysisService.get99LineData(url, response);
     }
 
     /**

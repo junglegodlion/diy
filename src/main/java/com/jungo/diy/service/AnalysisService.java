@@ -13,6 +13,7 @@ import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.DateUtils;
+import com.jungo.diy.util.JsonUtils;
 import com.jungo.diy.util.PerformanceUtils;
 import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -73,7 +74,17 @@ public class AnalysisService {
         } catch (Exception e) {
             log.error("AnalysisService#get99LineCurve,出现异常！", e);
         }
-        return "success";
+        return JsonUtils.objectToJson(p99Models);
+    }
+
+    public List<P99Model> get99LineData(String url, HttpServletResponse response) {
+        LocalDate startDate = RequestContext.getAs("startDate", LocalDate.class);
+        LocalDate endDate = RequestContext.getAs("endDate", LocalDate.class);
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
+        // apiDailyPerformanceEntities按照日期排序
+        apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
+
+        return getP99Models(apiDailyPerformanceEntities);
     }
 
     private List<P99Model> getP99Models(List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities) {
