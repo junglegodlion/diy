@@ -39,7 +39,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
-import static com.jungo.diy.util.ExcelChartGenerator.*;
 
 
 /**
@@ -48,6 +47,7 @@ import static com.jungo.diy.util.ExcelChartGenerator.*;
  */
 @RestController
 @Slf4j
+@Deprecated
 public class FileReadController {
 
     @Autowired
