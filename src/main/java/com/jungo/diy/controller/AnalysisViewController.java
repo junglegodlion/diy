@@ -24,14 +24,4 @@ public class AnalysisViewController {
         model.addAttribute("endDate", LocalDate.now());
         return "analysis";
     }
-
-    @GetMapping("/download")
-    public void downloadFile(
-            @RequestParam String filePath,
-            HttpServletResponse response) throws IOException {
-        File file = new File(filePath);
-        response.setContentType("application/msword");
-        response.setHeader("Content-Disposition", "attachment; filename=" + file.getName());
-        Files.copy(file.toPath(), response.getOutputStream());
-    }
 }
