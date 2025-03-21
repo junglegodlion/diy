@@ -6,6 +6,7 @@
         <id column="id" property="id" jdbcType="INTEGER"/>
         <result column="page_name" property="pageName" jdbcType="VARCHAR"/>
         <result column="interface_url" property="interfaceUrl" jdbcType="VARCHAR"/>
+        <result column="host" property="host" jdbcType="VARCHAR"/>
         <result column="p99_target" property="p99Target" jdbcType="INTEGER"/>
         <result column="slow_request_rate_target" property="slowRequestRateTarget" jdbcType="DECIMAL"/>
         <result column="interface_type" property="interfaceType" jdbcType="INTEGER"/>
@@ -48,16 +49,6 @@
         WHERE id = #{id}
     </update>
 
-    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM core_interface_config
-        WHERE id = #{id} AND is_deleted = 0
-    </select>
-
-    <delete id="deleteById" parameterType="java.lang.Integer">
-        DELETE FROM core_interface_config
-        WHERE id = #{id}
-    </delete>
 
     <insert id="batchInsert">
         INSERT INTO core_interface_config(page_name, interface_url, p99_target, slow_request_rate_target,
@@ -70,7 +61,7 @@
     </insert>
 
     <select id="getCoreInterfaceConfigByInterfaceType" resultMap="BaseResultMap">
-        SELECT <include refid="Base_Column_List"/>
+        SELECT *
         FROM core_interface_config
         WHERE interface_type = #{interfaceType} AND is_deleted = 0
         ORDER BY sort_order

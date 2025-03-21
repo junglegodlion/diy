@@ -1,11 +1,13 @@
 package com.jungo.diy.service;
 
 import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
+import com.jungo.diy.enums.InterfaceTypeEnum;
 import com.jungo.diy.model.PerformanceResult;
 import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.TableUtils;
+import com.jungo.diy.util.TokenUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
@@ -100,27 +102,64 @@ public class ReportGenerationService {
         PerformanceResult result = analysisService.getPerformanceResult(startDate, endDate);
         // 生成网关性能变化曲线图
         generateGateWayPerformanceCurveChart(endDate, directoryPath);
-        // 关键路径未达标接口性能曲线图
-        generateTrendChartOfCriticalPath99NotMeetingTheStandard(result.getCriticalLinkUrlPerformanceResponses(), endDate, directoryPath);
+        // 未达标接口性能曲线图
+        generateTrendChartNonCompliantInterfaces(result, endDate, directoryPath);
         // 生成word文档
         generateWord(startDate, endDate, result, directoryPath);
 
         return directoryPath;
     }
 
-    private void generateTrendChartOfCriticalPath99NotMeetingTheStandard(List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses,
-                                                                         LocalDate endDate,
-                                                                         String directoryPath) {
+    private void generateTrendChartNonCompliantInterfaces(PerformanceResult result, LocalDate endDate, String directoryPath) {
         LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
-        List<String> urls = criticalLinkUrlPerformanceResponses.stream().filter(x -> Boolean.FALSE.equals(x.getReachTarget())).map(x -> x.getUrl()).collect(Collectors.toList());
-        String[] urlsArray = urls.toArray(new String[0]);
 
-        try (XSSFWorkbook workbook = analysisService.batchGet99LineCurve(urlsArray, startDateForMonthPerformanceTrend)) {
-            String fileName = URLEncoder.encode("TrendChartOfCriticalPath99NotMeetingTheStandard.xlsx", StandardCharsets.UTF_8.toString());
-            /* 执行文件写入操作 */
+        // 统一处理所有接口类型
+        List<String> nonCompliantUrls = Arrays.stream(InterfaceTypeEnum.values())
+                .map(type -> extractNonCompliantUrls(result, type))
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList());
+
+        try (XSSFWorkbook workbook = analysisService.batchGet99LineCurve(nonCompliantUrls.toArray(new String[0]), startDateForMonthPerformanceTrend)) {
+            String fileName = URLEncoder.encode("NonCompliantInterfaces.xlsx", StandardCharsets.UTF_8.toString());
             saveWorkbookToFile(workbook, directoryPath, fileName);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            log.error("Failed to generate trend chart for non-compliant interfaces", e);
+            throw new UncheckedIOException("Error generating trend chart file", e);
+        }
+    }
+
+    /**
+     * 提取指定类型的未达标 URL 列表
+     */
+    private List<String> extractNonCompliantUrls(PerformanceResult result, InterfaceTypeEnum type) {
+        return Optional.ofNullable(getPerformanceResponses(result, type))
+                // 防止 NullPointerException
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(x -> Boolean.FALSE.equals(x.getReachTarget()))
+                .map(x -> TokenUtils.generateToken(x.getHost(), x.getUrl()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据类型获取 PerformanceResult 中的 URL 响应列表
+     */
+    private List<UrlPerformanceResponse> getPerformanceResponses(PerformanceResult result, InterfaceTypeEnum type) {
+        switch (type) {
+            case CRITICAL_LINK:
+                return result.getCriticalLinkUrlPerformanceResponses();
+            case FIVE_GANG_JING:
+                return result.getFiveGangJingUrlPerformanceResponses();
+            case FIRST_SCREEN_TAB:
+                return result.getFirstScreenTabUrlPerformanceResponses();
+            case QILIN_COMPONENT_INTERFACE:
+                return result.getQilinComponentInterfaceUrlPerformanceResponses();
+            case OTHER_CORE_BUSINESS_INTERFACE:
+                return result.getOtherCoreBusinessInterfaceUrlPerformanceResponses();
+            case ACCESS_VOLUME_TOP30:
+                return result.getAccessVolumeTop30Interface();
+            default:
+                return Collections.emptyList();
         }
     }
 
@@ -146,10 +185,6 @@ public class ReportGenerationService {
         // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
             setWordStyle(document);
-
-            // jungo TODO 2025/3/12:
-            // setCatalog(document);
-
             // 第一部分：网关性能监控
             setFirstLevelTitle(document, "一、网关性能监控");
             List<Section> sections = Arrays.asList(

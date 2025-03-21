@@ -17,7 +17,9 @@ public enum InterfaceTypeEnum {
     // 麒麟组件接口
     QILIN_COMPONENT_INTERFACE(4, "麒麟组件接口"),
     // 其他核心业务接口
-    OTHER_CORE_BUSINESS_INTERFACE(5, "其他核心业务接口");
+    OTHER_CORE_BUSINESS_INTERFACE(5, "其他核心业务接口"),
+
+    ACCESS_VOLUME_TOP30(6, "访问量前30");
 
     private final Integer code;
     private final String description;

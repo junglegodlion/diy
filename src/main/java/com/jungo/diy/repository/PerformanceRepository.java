@@ -12,12 +12,14 @@ import com.jungo.diy.model.SlowRequestRateModel;
 import com.jungo.diy.model.UrlPerformanceModel;
 import com.jungo.diy.response.UrlPerformanceResponse;
 import com.jungo.diy.util.DateUtils;
+import com.jungo.diy.util.TokenUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -52,75 +54,68 @@ public class PerformanceRepository {
     }
 
     /**
-     * 获取指定日期范围内接口性能数据的映射表
+     * 获取指定日期范围内的接口性能数据，并将其封装为UrlPerformanceModel的Map。
      *
-     * @param startDate 统计起始日期（上周日期）
-     * @param endDate   统计结束日期（本周日期）
-     * @return 以接口URL为键，包含本周与上周性能对比数据的UrlPerformanceModel映射表
+     * @param startDate 开始日期，用于获取该天的接口性能数据
+     * @param endDate 结束日期，用于获取该天的接口性能数据
+     * @return 返回一个Map，其中键为接口的唯一标识符（token），值为对应的UrlPerformanceModel对象
      */
     public Map<String, UrlPerformanceModel> getUrlPerformanceModelMap(LocalDate startDate, LocalDate endDate) {
-        // 获取startDate这天的所有接口性能数据
-        List<ApiDailyPerformanceEntity> startDateApiDailyPerformanceEntities = apiDailyPerformanceMapper.findAllByDate(startDate);
-        // 获取endDate这天的所有接口性能数据
-        List<ApiDailyPerformanceEntity> endDateApiDailyPerformanceEntities = apiDailyPerformanceMapper.findAllByDate(endDate);
-        // 上周的接口性能数据
-        List<InterfacePerformanceModel> lastWeek = startDateApiDailyPerformanceEntities.stream().map(x -> {
-            InterfacePerformanceModel newInterfacePerformanceModel = new InterfacePerformanceModel();
-            newInterfacePerformanceModel.setToken(x.getHost() + x.getUrl());
-            newInterfacePerformanceModel.setHost(x.getHost());
-            newInterfacePerformanceModel.setUrl(x.getUrl());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setP99(x.getP99());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setSlowRequestCount(x.getSlowRequestCount());
+        // 查询性能数据
+        List<ApiDailyPerformanceEntity> startDateEntities = apiDailyPerformanceMapper.findAllByDate(startDate);
+        List<ApiDailyPerformanceEntity> endDateEntities = apiDailyPerformanceMapper.findAllByDate(endDate);
 
-            return newInterfacePerformanceModel;
-        }).collect(Collectors.toList());
-        // 本周的接口性能数据
-        List<InterfacePerformanceModel> thisWeek = endDateApiDailyPerformanceEntities.stream().map(x -> {
-            InterfacePerformanceModel newInterfacePerformanceModel = new InterfacePerformanceModel();
-            newInterfacePerformanceModel.setToken(x.getHost() + x.getUrl());
-            newInterfacePerformanceModel.setHost(x.getHost());
-            newInterfacePerformanceModel.setUrl(x.getUrl());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setP99(x.getP99());
-            newInterfacePerformanceModel.setTotalRequestCount(x.getTotalRequestCount());
-            newInterfacePerformanceModel.setSlowRequestCount(x.getSlowRequestCount());
-            return newInterfacePerformanceModel;
-        }).collect(Collectors.toList());
+        // 将接口性能数据转换成 Map
+        Map<String, InterfacePerformanceModel> lastWeekMap = convertToPerformanceMap(startDateEntities);
+        Map<String, InterfacePerformanceModel> thisWeekMap = convertToPerformanceMap(endDateEntities);
 
-        // 将lastWeek转换成map
-        Map<String, InterfacePerformanceModel> lastWeekMap = lastWeek.stream().collect(Collectors.toMap(InterfacePerformanceModel::getToken, x -> x, (x, y) -> x));
-        // 将thisWeek转换成map
-        Map<String, InterfacePerformanceModel> thisWeekMap = thisWeek.stream().collect(Collectors.toMap(InterfacePerformanceModel::getToken, x -> x, (x, y) -> x));
-        // 组装UrlPerformanceModel对象
-        List<UrlPerformanceModel> urlPerformanceModels = new ArrayList<>();
-        for (Map.Entry<String, InterfacePerformanceModel> entry : thisWeekMap.entrySet()) {
-            String token = entry.getKey();
-            InterfacePerformanceModel thisWeekInterfacePerformanceModel = entry.getValue();
-            InterfacePerformanceModel lastWeekInterfacePerformanceModel = lastWeekMap.get(token);
-            if (Objects.nonNull(lastWeekInterfacePerformanceModel)) {
-                UrlPerformanceModel urlPerformanceModel = new UrlPerformanceModel();
-                urlPerformanceModel.setToken(token);
-                urlPerformanceModel.setHost(thisWeekInterfacePerformanceModel.getHost());
-                urlPerformanceModel.setUrl(thisWeekInterfacePerformanceModel.getUrl());
-                urlPerformanceModel.setLastWeek(lastWeekInterfacePerformanceModel);
-                urlPerformanceModel.setThisWeek(thisWeekInterfacePerformanceModel);
-                urlPerformanceModels.add(urlPerformanceModel);
-            }
+        // 组装 UrlPerformanceModel 对象并转换成 Map
+        return thisWeekMap.entrySet().stream()
+                // 仅保留上周也存在的数据
+                .filter(entry -> lastWeekMap.containsKey(entry.getKey()))
+                .map(entry -> {
+                    String token = entry.getKey();
+                    InterfacePerformanceModel thisWeek = entry.getValue();
+                    InterfacePerformanceModel lastWeek = lastWeekMap.get(token);
 
-        }
-
-        // urlPerformanceModels转成map
-        return urlPerformanceModels.stream().collect(Collectors.toMap(UrlPerformanceModel::getUrl, x -> x, (x, y) -> x));
+                    UrlPerformanceModel urlPerformanceModel = new UrlPerformanceModel();
+                    urlPerformanceModel.setToken(token);
+                    urlPerformanceModel.setHost(thisWeek.getHost());
+                    urlPerformanceModel.setUrl(thisWeek.getUrl());
+                    urlPerformanceModel.setLastWeek(lastWeek);
+                    urlPerformanceModel.setThisWeek(thisWeek);
+                    return urlPerformanceModel;
+                })
+                .collect(Collectors.toMap(UrlPerformanceModel::getToken, Function.identity()));
     }
+
+    /**
+     * 将 ApiDailyPerformanceEntity 列表转换为 Map<String, InterfacePerformanceModel>
+     */
+    private Map<String, InterfacePerformanceModel> convertToPerformanceMap(List<ApiDailyPerformanceEntity> entities) {
+        return entities.stream().collect(Collectors.toMap(
+                entity -> TokenUtils.generateToken(entity.getHost(), entity.getUrl()),
+                entity -> {
+                    InterfacePerformanceModel model = new InterfacePerformanceModel();
+                    model.setToken(TokenUtils.generateToken(entity.getHost(), entity.getUrl()));
+                    model.setHost(entity.getHost());
+                    model.setUrl(entity.getUrl());
+                    model.setTotalRequestCount(entity.getTotalRequestCount());
+                    model.setP99(entity.getP99());
+                    model.setSlowRequestCount(entity.getSlowRequestCount());
+                    return model;
+                },
+                (existing, replacement) -> existing
+        ));
+    }
+
 
     public List<UrlPerformanceResponse> getUrlPerformanceResponses(Integer code, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
         List<CoreInterfaceConfigEntity> criticalLinkCoreInterface = coreInterfaceConfigMapper.getCoreInterfaceConfigByInterfaceType(code);
         List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = new ArrayList<>();
         for (CoreInterfaceConfigEntity coreInterfaceConfigEntity : criticalLinkCoreInterface) {
-            String url = coreInterfaceConfigEntity.getInterfaceUrl();
-            UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
+            String token = TokenUtils.generateToken(coreInterfaceConfigEntity.getHost(), coreInterfaceConfigEntity.getInterfaceUrl());
+            UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(token);
             if (urlPerformanceModel != null) {
                 UrlPerformanceResponse urlPerformanceResponse = getUrlPerformanceResponse(urlPerformanceModel, coreInterfaceConfigEntity);
                 criticalLinkUrlPerformanceResponses.add(urlPerformanceResponse);
@@ -129,6 +124,13 @@ public class PerformanceRepository {
         return criticalLinkUrlPerformanceResponses;
     }
 
+    /**
+     * 根据给定的UrlPerformanceModel和CoreInterfaceConfigEntity生成UrlPerformanceResponse对象。
+     *
+     * @param urlPerformanceModel 包含URL性能数据的模型对象，提供主机、URL、上周和本周的P99、总请求数、慢请求率等信息。
+     * @param coreInterfaceConfigEntity 包含核心接口配置的实体对象，提供页面名称、P99目标、接口类型、负责人等信息。
+     * @return UrlPerformanceResponse 返回生成的URL性能响应对象，包含从输入模型中提取的性能数据和配置信息。
+     */
     private UrlPerformanceResponse getUrlPerformanceResponse(UrlPerformanceModel urlPerformanceModel, CoreInterfaceConfigEntity coreInterfaceConfigEntity) {
         UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
         urlPerformanceResponse.setHost(urlPerformanceModel.getHost());

@@ -16,6 +16,7 @@ import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.JsonUtils;
 import com.jungo.diy.util.PerformanceUtils;
 import com.jungo.diy.util.TableUtils;
+import com.jungo.diy.util.TokenUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -90,20 +91,25 @@ public class AnalysisService {
     private List<P99Model> getP99Models(List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities) {
         List<P99Model> p99Models = new ArrayList<>();
         for (ApiDailyPerformanceEntity apiDailyPerformanceEntity : apiDailyPerformanceEntities) {
-            P99Model p99Model = new P99Model();
-            Date date = apiDailyPerformanceEntity.getDate();
-            // 将 Date 对象转换为 LocalDate 对象
-            Instant instant = date.toInstant();
-            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-            // 定义日期格式
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            // 将 LocalDate 对象转换为字符串
-            String dateString = localDate.format(formatter);
-            p99Model.setDate(dateString);
-            p99Model.setP99(apiDailyPerformanceEntity.getP99());
+            P99Model p99Model = getP99Model(apiDailyPerformanceEntity);
             p99Models.add(p99Model);
         }
         return p99Models;
+    }
+
+    private P99Model getP99Model(ApiDailyPerformanceEntity apiDailyPerformanceEntity) {
+        P99Model p99Model = new P99Model();
+        Date date = apiDailyPerformanceEntity.getDate();
+        // 将 Date 对象转换为 LocalDate 对象
+        Instant instant = date.toInstant();
+        LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
+        // 定义日期格式
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        // 将 LocalDate 对象转换为字符串
+        String dateString = localDate.format(formatter);
+        p99Model.setDate(dateString);
+        p99Model.setP99(apiDailyPerformanceEntity.getP99());
+        return p99Model;
     }
 
     private List<P99Model> getNewP99Models(List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities) {
@@ -152,71 +158,70 @@ public class AnalysisService {
     }
 
     public PerformanceResult getPerformanceResult(LocalDate startDate, LocalDate endDate) {
-
+        // 获取URL性能数据
         Map<String, UrlPerformanceModel> urlPerformanceModelMap = performanceRepository.getUrlPerformanceModelMap(startDate, endDate);
-        // 关键链路
-        List<UrlPerformanceResponse> criticalLinkUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.CRITICAL_LINK.getCode(), urlPerformanceModelMap);
 
-        // 五大金刚
-        List<UrlPerformanceResponse> fiveGangJingUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.FIVE_GANG_JING.getCode(), urlPerformanceModelMap);
+        // 获取不同类型的接口性能响应
+        Map<InterfaceTypeEnum, List<UrlPerformanceResponse>> performanceResponses = Arrays.stream(InterfaceTypeEnum.values())
+                .collect(Collectors.toMap(type -> type, type -> performanceRepository.getUrlPerformanceResponses(type.getCode(), urlPerformanceModelMap)));
 
-        // 首屏tab
-        List<UrlPerformanceResponse> firstScreenTabUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.FIRST_SCREEN_TAB.getCode(), urlPerformanceModelMap);
+        // 获取访问量 Top 30 接口
+        List<UrlPerformanceResponse> accessVolumeTop30Interface = filterTop30Interfaces(urlPerformanceModelMap, performanceResponses);
 
-        // 麒麟组件接口
-        List<UrlPerformanceResponse> qilinComponentInterfaceUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.QILIN_COMPONENT_INTERFACE.getCode(), urlPerformanceModelMap);
-
-        // 其他核心业务接口
-        List<UrlPerformanceResponse> otherCoreBusinessInterfaceUrlPerformanceResponses = performanceRepository.getUrlPerformanceResponses(InterfaceTypeEnum.OTHER_CORE_BUSINESS_INTERFACE.getCode(), urlPerformanceModelMap);
-
-        // 访问量top30接口
-        // 首先将urlPerformanceModels排除host为"mkt-gateway.tuhu.cn"的对象，然后按照thisWeek.totalRequestCount逆序排序，最后取前30个url
-        List<UrlPerformanceModel> sortUrlPerformanceModels = urlPerformanceModelMap.values().stream()
-                .filter(urlPerformanceModel -> !"mkt-gateway.tuhu.cn".equals(urlPerformanceModel.getHost()))
-                .sorted((o1, o2) -> o2.getThisWeek().getTotalRequestCount() - o1.getThisWeek().getTotalRequestCount()).collect(Collectors.toList());
-        List<UrlPerformanceResponse> accessVolumeTop30Interface = sortUrlPerformanceModels.stream()
-                .limit(30)
-                .filter(urlPerformanceModel -> {
-                    String url = urlPerformanceModel.getUrl();
-                    return Stream.of(criticalLinkUrlPerformanceResponses, fiveGangJingUrlPerformanceResponses,
-                                    firstScreenTabUrlPerformanceResponses, qilinComponentInterfaceUrlPerformanceResponses,
-                                    otherCoreBusinessInterfaceUrlPerformanceResponses)
-                            .noneMatch(list -> coreInterfaceContains(list, url));
-                })
-                .map(urlPerformanceModel -> getUrlPerformanceResponse(urlPerformanceModel.getUrl(), urlPerformanceModelMap))
-                .collect(Collectors.toList());
-
-        // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        // 月平均慢请求率
+        // 获取慢请求率相关数据
         List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
-        // 获取周大盘数据数据情况
         List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationTable(startDate, endDate);
-        // weeklyMarketDataSituationData的平均值
-        double averageSlowRequestRateInThePastWeek = weeklyMarketDataSituationData.stream().mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate).average().orElse(0.0);
+        double averageSlowRequestRateInThePastWeek = weeklyMarketDataSituationData.stream()
+                .mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate)
+                .average()
+                .orElse(0.0);
         LocalDate startDateForMonthSlowRequestRateTrend = endDate.minusDays(30);
         List<GateWayDailyPerformanceEntity> monthlySlowRequestRateTrendData = performanceRepository.getMonthlySlowRequestRateTrendData(startDateForMonthSlowRequestRateTrend, endDate);
-
 
         return PerformanceResult.builder()
                 .gatewayAverageSlowRequestRate(gatewayAverageSlowRequestRate)
                 .averageSlowRequestRateInThePastWeek(averageSlowRequestRateInThePastWeek)
                 .weeklyMarketDataSituationData(weeklyMarketDataSituationData)
                 .monthlySlowRequestRateTrendData(monthlySlowRequestRateTrendData)
-                .criticalLinkUrlPerformanceResponses(criticalLinkUrlPerformanceResponses)
-                .fiveGangJingUrlPerformanceResponses(fiveGangJingUrlPerformanceResponses)
-                .firstScreenTabUrlPerformanceResponses(firstScreenTabUrlPerformanceResponses)
-                .qilinComponentInterfaceUrlPerformanceResponses(qilinComponentInterfaceUrlPerformanceResponses)
-                .otherCoreBusinessInterfaceUrlPerformanceResponses(otherCoreBusinessInterfaceUrlPerformanceResponses)
+                .criticalLinkUrlPerformanceResponses(performanceResponses.get(InterfaceTypeEnum.CRITICAL_LINK))
+                .fiveGangJingUrlPerformanceResponses(performanceResponses.get(InterfaceTypeEnum.FIVE_GANG_JING))
+                .firstScreenTabUrlPerformanceResponses(performanceResponses.get(InterfaceTypeEnum.FIRST_SCREEN_TAB))
+                .qilinComponentInterfaceUrlPerformanceResponses(performanceResponses.get(InterfaceTypeEnum.QILIN_COMPONENT_INTERFACE))
+                .otherCoreBusinessInterfaceUrlPerformanceResponses(performanceResponses.get(InterfaceTypeEnum.OTHER_CORE_BUSINESS_INTERFACE))
                 .accessVolumeTop30Interface(accessVolumeTop30Interface)
                 .build();
-
-
     }
 
-    private static UrlPerformanceResponse getUrlPerformanceResponse(String url,
-                                                                    Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
-        UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(url);
+    /**
+     * 过滤访问量 Top 30 的接口
+     */
+    private List<UrlPerformanceResponse> filterTop30Interfaces(Map<String, UrlPerformanceModel> urlPerformanceModelMap,
+                                                               Map<InterfaceTypeEnum, List<UrlPerformanceResponse>> performanceResponses) {
+        // 排除指定 host，并按 thisWeek.totalRequestCount 降序排序
+        List<UrlPerformanceModel> sortedModels = urlPerformanceModelMap.values().stream()
+                .filter(model -> !"mkt-gateway.tuhu.cn".equals(model.getHost()))
+                // 逆序排序
+                .sorted(Comparator.comparingInt(o -> -o.getThisWeek().getTotalRequestCount()))
+                .collect(Collectors.toList());
+
+        // 获取前 30 个并排除已经在核心业务接口中的 URL
+        return sortedModels.stream()
+                .limit(30)
+                .filter(model -> isNotInCoreInterfaces(model.getUrl(), performanceResponses))
+                .map(model -> getUrlPerformanceResponse(TokenUtils.generateToken(model.getHost(), model.getUrl()), urlPerformanceModelMap))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 判断 URL 是否已存在于核心业务接口
+     */
+    private boolean isNotInCoreInterfaces(String url, Map<InterfaceTypeEnum, List<UrlPerformanceResponse>> performanceResponses) {
+        return performanceResponses.values().stream().noneMatch(list -> coreInterfaceContains(list, url));
+    }
+
+
+    private static UrlPerformanceResponse getUrlPerformanceResponse(String token, Map<String, UrlPerformanceModel> urlPerformanceModelMap) {
+        UrlPerformanceModel urlPerformanceModel = urlPerformanceModelMap.get(token);
         UrlPerformanceResponse urlPerformanceResponse = new UrlPerformanceResponse();
         urlPerformanceResponse.setHost(urlPerformanceModel.getHost());
         urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
@@ -593,24 +598,59 @@ public class AnalysisService {
         return "success";
     }
 
-    public XSSFWorkbook batchGet99LineCurve(String[] urls, @PastOrPresent LocalDate startDate) {
-        Map<String, List<P99Model>> urlMap = new HashMap<>();
+    public XSSFWorkbook batchGet99LineCurve(String[] tokens, @PastOrPresent LocalDate startDate) {
         LocalDate now = LocalDate.now();
-        for (String url : urls) {
-            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(null, url, startDate, now);
-            // apiDailyPerformanceEntities按照日期排序
-            apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
-            List<P99Model> p99Models = getP99Models(apiDailyPerformanceEntities);
-            urlMap.put(url, p99Models);
-        }
 
-        // 画图
+        // 并行获取数据，使用 ConcurrentHashMap 避免线程安全问题
+        Map<String, List<P99Model>> urlMap = Arrays.stream(tokens)
+                .parallel()
+                .collect(Collectors.toConcurrentMap(
+                        token -> token,
+                        token -> extractP99Data(token, startDate, now)
+                ));
+
+        // 创建 Excel 工作簿
         XSSFWorkbook workbook = new XSSFWorkbook();
-        for (String url : urls) {
-            String sheetName = url.substring(url.lastIndexOf("/") + 1);
-            createP99ModelSheet(workbook, sheetName, urlMap.get(url), "gateway 99线", "日期", "99线", "99线");
-        }
+        urlMap.forEach((token, p99Models) -> {
+            String sheetName = generateSheetName(token);
+            createP99ModelSheet(workbook, sheetName, p99Models, "gateway 99线", "日期", "99线", "99线");
+        });
+
         return workbook;
+    }
+
+    /**
+     * 生成 Excel Sheet 名称，防止超长
+     */
+    private String generateSheetName(String token) {
+        String name = token.substring(token.lastIndexOf("/") + 1);
+        return name.length() > 31 ? name.substring(0, 28) + "..." : name;
+    }
+
+    /**
+     * 提取 P99 数据
+     */
+    private List<P99Model> extractP99Data(String token, LocalDate startDate, LocalDate now) {
+        try {
+            String[] parseToken = TokenUtils.parseToken(token);
+            if (parseToken.length < 2) {
+                log.warn("Invalid token format: {}", token);
+                return Collections.emptyList();
+            }
+
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities =
+                    apiDailyPerformanceMapper.findUrl99Line(parseToken[0], parseToken[1], startDate, now);
+
+            // 按日期排序
+            return apiDailyPerformanceEntities.stream()
+                    .sorted(Comparator.comparing(ApiDailyPerformanceEntity::getDate))
+                    .map(this::getP99Model)
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            log.error("Error processing token: {}", token, e);
+            return Collections.emptyList();
+        }
     }
 
     public String batchGetSlowRequestRateCurve(String[] urls,

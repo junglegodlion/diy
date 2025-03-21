@@ -30,6 +30,11 @@ public class CoreInterfaceConfigEntity {
     private String interfaceUrl;
 
     /**
+     * host
+     */
+    private String host;
+
+    /**
      * 99线基线目标(ms)
      */
     private Integer p99Target;
