@@ -63,6 +63,7 @@ public class AnalysisController {
     @GetMapping("/get99LineCurve")
     @ApiOperation(value = "图-获取某一接口几号到几号的99线变化曲线", notes = "通过analysisService生成99线变化曲线图表后，直接通过response对象返回结果")
     public String get99LineCurve(
+            @ApiParam(value = "host", required = true) @RequestParam("host") @NotBlank(message = "host不能为空") String host,
             @ApiParam(value = "接口URL", required = true) @RequestParam("url") @NotBlank(message = "URL不能为空") String url,
             @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
             @ApiParam(value = "结束日期（格式：yyyy-MM-dd）", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
@@ -79,7 +80,7 @@ public class AnalysisController {
         // 设置响应头
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setHeader("Content-Disposition", "attachment;filename=get99LineCurve_chart.xlsx");
-        return analysisService.get99LineCurve(url, response);
+        return analysisService.get99LineCurve(host, url, response);
     }
 
     /**
@@ -93,6 +94,7 @@ public class AnalysisController {
     @GetMapping("/get99LineData")
     @ApiOperation(value = "数据-获取某一接口几号到几号的99线变化")
     public List<P99Model> get99LineData(
+            @ApiParam(value = "host", required = true) @RequestParam("host") @NotBlank(message = "host不能为空") String host,
             @ApiParam(value = "接口URL", required = true) @RequestParam("url") @NotBlank(message = "URL不能为空") String url,
             @ApiParam(value = "起始日期（格式：yyyy-MM-dd）", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") @PastOrPresent LocalDate startDate,
             @ApiParam(value = "结束日期（格式：yyyy-MM-dd）", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate,
@@ -107,7 +109,7 @@ public class AnalysisController {
         RequestContext.put("endDate", endDate);
 
         // 设置响应头
-        return analysisService.get99LineData(url, response);
+        return analysisService.get99LineData(host, url, response);
     }
 
     /**

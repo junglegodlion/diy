@@ -23,7 +23,7 @@ public interface ApiDailyPerformanceMapper {
 
     int batchInsert(List<ApiDailyPerformanceEntity> list);
 
-    List<ApiDailyPerformanceEntity> findUrl99Line(@Param("url")String url, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    List<ApiDailyPerformanceEntity> findUrl99Line(@Param("host")String host, @Param("url")String url, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     List<ApiDailyPerformanceEntity> findAllByDate(LocalDate startDate);
 

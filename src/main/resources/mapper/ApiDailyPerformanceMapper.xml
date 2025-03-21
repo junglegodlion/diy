@@ -33,8 +33,17 @@
     </insert>
 
     <select id="findUrl99Line" resultType="com.jungo.diy.entity.ApiDailyPerformanceEntity">
-        SELECT * FROM api_daily_performance WHERE url = #{url} AND date BETWEEN #{startDate} AND #{endDate}
+        SELECT *
+        FROM api_daily_performance
+        <where>
+            <if test="host != null">
+                host = #{host}
+            </if>
+            AND url = #{url}
+            AND date BETWEEN #{startDate} AND #{endDate}
+        </where>
     </select>
+
 
     <select id="findAllByDate" resultMap="BaseResultMap">
         SELECT * FROM api_daily_performance WHERE date = #{date}

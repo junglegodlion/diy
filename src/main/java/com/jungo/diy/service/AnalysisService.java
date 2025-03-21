@@ -56,10 +56,10 @@ public class AnalysisService {
     @Autowired
     private PerformanceRepository performanceRepository;
 
-    public String get99LineCurve(String url, HttpServletResponse response) {
+    public String get99LineCurve(String host, String url, HttpServletResponse response) {
         LocalDate startDate = RequestContext.getAs("startDate", LocalDate.class);
         LocalDate endDate = RequestContext.getAs("endDate", LocalDate.class);
-        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(host, url, startDate, endDate);
         // apiDailyPerformanceEntities按照日期排序
         apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
 
@@ -77,10 +77,10 @@ public class AnalysisService {
         return JsonUtils.objectToJson(p99Models);
     }
 
-    public List<P99Model> get99LineData(String url, HttpServletResponse response) {
+    public List<P99Model> get99LineData(String host, String url, HttpServletResponse response) {
         LocalDate startDate = RequestContext.getAs("startDate", LocalDate.class);
         LocalDate endDate = RequestContext.getAs("endDate", LocalDate.class);
-        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
+        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(host, url, startDate, endDate);
         // apiDailyPerformanceEntities按照日期排序
         apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
 
@@ -570,7 +570,7 @@ public class AnalysisService {
     public String batchGet99LineCurve(String[] urls, @PastOrPresent LocalDate startDate, LocalDate endDate, HttpServletResponse response) {
         Map<String, List<P99Model>> urlMap = new HashMap<>();
         for (String url : urls) {
-            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, endDate);
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(null, url, startDate, endDate);
             // apiDailyPerformanceEntities按照日期排序
             apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
             List<P99Model> p99Models = getP99Models(apiDailyPerformanceEntities);
@@ -597,7 +597,7 @@ public class AnalysisService {
         Map<String, List<P99Model>> urlMap = new HashMap<>();
         LocalDate now = LocalDate.now();
         for (String url : urls) {
-            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(url, startDate, now);
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.findUrl99Line(null, url, startDate, now);
             // apiDailyPerformanceEntities按照日期排序
             apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
             List<P99Model> p99Models = getP99Models(apiDailyPerformanceEntities);
