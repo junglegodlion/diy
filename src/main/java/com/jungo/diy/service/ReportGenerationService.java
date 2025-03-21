@@ -35,6 +35,7 @@ import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.jungo.diy.util.DateUtils.MM_DD;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
@@ -182,31 +183,12 @@ public class ReportGenerationService {
     }
 
     private void generateWord(LocalDate startDate, LocalDate endDate, PerformanceResult result, String directoryPath) throws IOException {
-        // 创建一个新的Word文档
         try (XWPFDocument document = new XWPFDocument()) {
             setWordStyle(document);
+
             // 第一部分：网关性能监控
             setFirstLevelTitle(document, "一、网关性能监控");
-            List<Section> sections = Arrays.asList(
-                    new Section("cl-gateway 月平均慢请求率",
-                            d -> drawGatewayMonthlyAverageSlowRequestRateTable(d, result.getGatewayAverageSlowRequestRate())),
-                    new Section(startDate, endDate, "大盘数据数据情况",
-                            d -> {
-                                drawWeeklyMarketDataSituationTable(d, result.getWeeklyMarketDataSituationData());
-                                setText(d, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
-                            }),
-                    new Section(endDate.minusDays(30), endDate, "99线趋势",
-                            d -> insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false)),
-                    new Section(endDate.minusDays(30), endDate, "慢请求率趋势",
-                            d -> insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true)),
-                    new Section(LocalDate.now().getYear() + "年周维度99线趋势",
-                            d -> {/* 图片插入逻辑 */}),
-                    new Section(LocalDate.now().getYear() + "年周维度慢请求率趋势",
-                            d -> {/* 图片插入逻辑 */})
-            );
-
-            // 统一生成章节
-            generateSections(document, sections, 1);
+            generateGatewayPerformanceSection(document, result, startDate, endDate);
 
             // 第二部分：核心接口监控
             setFirstLevelTitle(document, "二、核心接口监控接口");
@@ -214,64 +196,100 @@ public class ReportGenerationService {
 
             // 第三部分：结论
             setFirstLevelTitle(document, "三、结论");
+            generateConclusionSection(document, result, startDate, endDate);
 
-            int monthValue = LocalDate.now().getMonthValue();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("M.d");
-            String dateRange = startDate.format(formatter)  + "~" + endDate.format(formatter);
-
-            StringBuilder str = new StringBuilder("一、核心接口（关键路径）需重点关注：");
-            str.append(endDate.format(formatter)).append("日\n");
-
-            List<UrlPerformanceResponse> dataList = result.getCriticalLinkUrlPerformanceResponses();
-            // 取出dataList不达标的数据
-            for (UrlPerformanceResponse urlPerformanceResponse : dataList) {
-                if (!urlPerformanceResponse.getReachTarget()) {
-                    str.append("【").append(urlPerformanceResponse.getPageName()).append("】").append(urlPerformanceResponse.getUrl()).append("\n").append(" 99线：").append(urlPerformanceResponse.getThisWeekP99()).append("ms 99线基线目标：").append(urlPerformanceResponse.getP99Target()).append("ms  @").append(urlPerformanceResponse.getOwner()).append("\n");
-                }
-            }
-
-            str.append("二、其他性能恶化的接口（").append(dateRange).append("对比，99 线增加超 30ms，且环比增幅超 10%）：\n");
-
-
-            List<UrlPerformanceResponse>[] dataLists = new List[] {
-                    result.getFiveGangJingUrlPerformanceResponses(),
-                    result.getFirstScreenTabUrlPerformanceResponses(),
-                    result.getQilinComponentInterfaceUrlPerformanceResponses(),
-                    result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(),
-                    result.getAccessVolumeTop30Interface()
-            };
-            for (List<UrlPerformanceResponse> performanceResponses : dataLists) {
-                // 取出dataList不达标的数据【轮胎列表主接口】/cl-tire-site/tireList/getCombineList 99线变化：+94ms  @平会
-                for (UrlPerformanceResponse urlPerformanceResponse : performanceResponses) {
-                    if (!urlPerformanceResponse.getReachTarget()) {
-                        str.append("【").append(urlPerformanceResponse.getPageName()).append("】").append(urlPerformanceResponse.getUrl()).append("\n").append(" 99线变化：").append(urlPerformanceResponse.getP99Change()).append("ms  @").append(urlPerformanceResponse.getOwner()).append("\n");
-                    }
-                }
-
-            }
-            // 生成完整文案
-
-            String report = "@所有人\n" +
-                    + monthValue + "月慢请求率概况：\n" +
-                    "--月均值：6.88%\n" +
-                    "--本周（" + dateRange + "）大盘均值：6.93%\n" +
-                    str +
-                    "请以上接口负责人提供性能恶化的原因，并推进相关治理措施。\n" +
-                    "本周数据明细详见 ：https://wiki.tuhu.cn/pages/viewpage.action?pageId=587414655";
-
-            setText(document, report);
-            // 保存文档
-            String fileName = URLEncoder.encode(  "performance.docx", StandardCharsets.UTF_8.toString());
-            String filePath = directoryPath + "/" + fileName;
-            try (FileOutputStream out = new FileOutputStream(filePath)) {
-                document.write(out);
-            }
+            // 保存 Word 文档
+            saveWordDocument(document, directoryPath);
         }
     }
 
-    private void setCatalog(XWPFDocument document) {
+    /**
+     * 生成网关性能监控部分
+     */
+    private void generateGatewayPerformanceSection(XWPFDocument document, PerformanceResult result, LocalDate startDate, LocalDate endDate) {
+        List<Section> sections = Arrays.asList(
+                new Section("cl-gateway 月平均慢请求率", d ->
+                        drawGatewayMonthlyAverageSlowRequestRateTable(d, result.getGatewayAverageSlowRequestRate())
+                ),
+                new Section(startDate, endDate, "大盘数据数据情况", d -> {
+                    drawWeeklyMarketDataSituationTable(d, result.getWeeklyMarketDataSituationData());
+                    setText(d, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
+                }),
+                new Section(endDate.minusDays(30), endDate, "99线趋势", d ->
+                        insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false)
+                ),
+                new Section(endDate.minusDays(30), endDate, "慢请求率趋势", d ->
+                        insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true)
+                ),
+                new Section(LocalDate.now().getYear() + "年周维度99线趋势", d -> {/* 图片插入逻辑 */}),
+                new Section(LocalDate.now().getYear() + "年周维度慢请求率趋势", d -> {/* 图片插入逻辑 */})
+        );
 
+        generateSections(document, sections, 1);
     }
+
+    /**
+     * 生成结论部分
+     */
+    private void generateConclusionSection(XWPFDocument document, PerformanceResult result, LocalDate startDate, LocalDate endDate) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("M.d");
+        String dateRange = startDate.format(formatter) + "~" + endDate.format(formatter);
+        int monthValue = LocalDate.now().getMonthValue();
+
+        // 处理核心接口（关键路径）
+        String criticalIssues = collectNonCompliantUrls(
+                result.getCriticalLinkUrlPerformanceResponses(),
+                String.format("一、核心接口（关键路径）需重点关注：%s日\n", endDate.format(formatter))
+        );
+
+        // 处理其他性能恶化的接口
+        List<UrlPerformanceResponse> otherIssuesResponses = Stream.of(
+                result.getFiveGangJingUrlPerformanceResponses(),
+                result.getFirstScreenTabUrlPerformanceResponses(),
+                result.getQilinComponentInterfaceUrlPerformanceResponses(),
+                result.getOtherCoreBusinessInterfaceUrlPerformanceResponses(),
+                result.getAccessVolumeTop30Interface()
+        ).flatMap(Collection::stream).collect(Collectors.toList());
+
+        String otherIssues = collectNonCompliantUrls(
+                otherIssuesResponses,
+                String.format("二、其他性能恶化的接口( %s 对比，99 线增加超 30ms，且环比增幅超 10%%)：\n", dateRange)
+        );
+
+        // 生成报告
+        String reportTemplate = "@所有人\n%d月慢请求率概况：\n--月均值：6.88%%\n--本周（%s）大盘均值：6.93%%\n%s%s请以上接口负责人提供性能恶化的原因，并推进相关治理措施。\n本周数据明细详见 ：https://wiki.tuhu.cn/pages/viewpage.action?pageId=587414655";
+        String report = String.format(reportTemplate, monthValue, dateRange, criticalIssues, otherIssues);
+
+        setText(document, report);
+    }
+
+
+    /**
+     * 处理不达标的接口数据
+     */
+    private String collectNonCompliantUrls(List<UrlPerformanceResponse> urlList, String header) {
+        StringJoiner joiner = new StringJoiner("\n", header + "\n", "\n");
+        urlList.stream()
+                .filter(url -> !url.getReachTarget())
+                .forEach(url -> joiner.add(
+                        String.format("【%s】%s\n 99线变化：%dms  @%s",
+                                url.getPageName(), url.getUrl(), url.getP99Change(), url.getOwner())
+                ));
+        return joiner.toString();
+    }
+
+    /**
+     * 统一保存 Word 文档
+     */
+    private void saveWordDocument(XWPFDocument document, String directoryPath) throws IOException {
+        String fileName = URLEncoder.encode("performance.docx", StandardCharsets.UTF_8.toString());
+        String filePath = directoryPath + "/" + fileName;
+
+        try (FileOutputStream out = new FileOutputStream(filePath)) {
+            document.write(out);
+        }
+    }
+
 
     // 新增章节生成器
     private void generateSections(XWPFDocument doc, List<Section> sections, int chapter) {
