@@ -29,10 +29,9 @@ public class ReportGenerationController {
 
     @ApiOperation(value = "为给定的日期范围生成Word文档", response = String.class)
     @GetMapping("/generate-word")
-    public String generateWord(
-            @ApiParam(value = "以yyyy-MM-dd格式表示的开始日期", required = true) @RequestParam("startDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate startDate,
-            @ApiParam(value = "以yyyy-MM-dd格式表示的结束日期", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
+    public String generateWord(@ApiParam(value = "以yyyy-MM-dd格式表示的结束日期", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
         try {
+            LocalDate startDate = endDate.minusDays(7);
             String filePath = reportGenerationService.generateWordDocument(startDate, endDate);
             return "Word文档生成成功，路径：" + filePath;
         } catch (IOException e) {
