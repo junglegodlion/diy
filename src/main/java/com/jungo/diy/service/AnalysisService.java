@@ -170,7 +170,8 @@ public class AnalysisService {
 
         // 获取慢请求率相关数据
         List<SlowRequestRateModel> gatewayAverageSlowRequestRate = performanceRepository.getGatewayAverageSlowRequestRate(LocalDate.now().getYear());
-        List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationTable(startDate, endDate);
+        // 获取endDate前6天的日期
+        List<GateWayDailyPerformanceEntity> weeklyMarketDataSituationData = performanceRepository.getWeeklyMarketDataSituationTable(endDate);
         double averageSlowRequestRateInThePastWeek = weeklyMarketDataSituationData.stream()
                 .mapToDouble(GateWayDailyPerformanceEntity::getSlowRequestRate)
                 .average()

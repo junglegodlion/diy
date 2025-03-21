@@ -185,11 +185,9 @@ public class PerformanceRepository {
         return slowRequestRateModels;
     }
 
-    // 获取月份
-
-
-    public List<GateWayDailyPerformanceEntity> getWeeklyMarketDataSituationTable(LocalDate startDate, LocalDate endDate) {
-        if (startDate != null && endDate != null) {
+    public List<GateWayDailyPerformanceEntity> getWeeklyMarketDataSituationTable(LocalDate endDate) {
+        if (endDate != null) {
+            LocalDate startDate = endDate.minusDays(6);
             List<GateWayDailyPerformanceEntity> apiDailyPerformanceEntities = gateWayDailyPerformanceMapper.getPerformanceByDate(startDate, endDate);
             // apiDailyPerformanceEntities按照date排序
             apiDailyPerformanceEntities.sort(Comparator.comparing(GateWayDailyPerformanceEntity::getDate));

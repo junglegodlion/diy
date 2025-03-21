@@ -354,7 +354,7 @@ public class ReportGenerationService {
             case 5:
                 return "其他核心业务接口";
             case 6:
-                return "请求量TOP接口";
+                return "请求量TOP30接口";
             default:
                 return "";
         }
