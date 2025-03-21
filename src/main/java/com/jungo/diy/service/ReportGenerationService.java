@@ -187,7 +187,7 @@ public class ReportGenerationService {
             setWordStyle(document);
 
             // 第一部分：网关性能监控
-            setFirstLevelTitle(document, "一、网关性能监控");
+            setFirstLevelTitle(document, "一、(cl-gateway)网关性能监控");
             generateGatewayPerformanceSection(document, result, startDate, endDate);
 
             // 第二部分：核心接口监控
@@ -211,18 +211,18 @@ public class ReportGenerationService {
                 new Section("cl-gateway 月平均慢请求率", d ->
                         drawGatewayMonthlyAverageSlowRequestRateTable(d, result.getGatewayAverageSlowRequestRate())
                 ),
-                new Section(startDate, endDate, "大盘数据数据情况", d -> {
+                new Section(startDate, endDate, "cl-gateway 大盘数据情况（最近7天）", d -> {
                     drawWeeklyMarketDataSituationTable(d, result.getWeeklyMarketDataSituationData());
                     setText(d, "最近一周慢请求率均值：" + TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek()));
                 }),
-                new Section(endDate.minusDays(30), endDate, "99线趋势", d ->
+                new Section(endDate.minusDays(30), endDate, "cl-gateway 大盘 99线趋势（最近30天）", d ->
                         insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "99线趋势", "日期", "毫秒", false)
                 ),
-                new Section(endDate.minusDays(30), endDate, "慢请求率趋势", d ->
+                new Section(endDate.minusDays(30), endDate, "cl-gateway 大盘 慢请求率趋势（最近30天）", d ->
                         insertLineChart(d, result.getMonthlySlowRequestRateTrendData(), "慢请求率趋势", "日期", "百分比", true)
                 ),
-                new Section(LocalDate.now().getYear() + "年周维度99线趋势", d -> {/* 图片插入逻辑 */}),
-                new Section(LocalDate.now().getYear() + "年周维度慢请求率趋势", d -> {/* 图片插入逻辑 */})
+                new Section(LocalDate.now().getYear() + "年cl-gateway大盘99线趋势-周维度", d -> {/* 图片插入逻辑 */}),
+                new Section(LocalDate.now().getYear() + "年cl-gateway大盘慢请求率趋势-周维度", d -> {/* 图片插入逻辑 */})
         );
 
         generateSections(document, sections, 1);
@@ -237,7 +237,7 @@ public class ReportGenerationService {
         int monthValue = LocalDate.now().getMonthValue();
 
         // 处理核心接口（关键路径）
-        String criticalIssues = collectNonCompliantUrls(
+        String criticalIssues = collectNonCompliantCriticalLinkUrls(
                 result.getCriticalLinkUrlPerformanceResponses(),
                 String.format("一、核心接口（关键路径）需重点关注：%s日\n", endDate.format(formatter))
         );
@@ -256,9 +256,17 @@ public class ReportGenerationService {
                 String.format("二、其他性能恶化的接口( %s 对比，99 线增加超 30ms，且环比增幅超 10%%)：\n", dateRange)
         );
 
+        // 取出大盘慢请求均值
+        String averageSlowRequestRateInThePastWeek = TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek());
+        // 取出月均值
+        List<SlowRequestRateModel> gatewayAverageSlowRequestRate = result.getGatewayAverageSlowRequestRate();
+        // gatewayAverageSlowRequestRate按照month倒序排列
+        gatewayAverageSlowRequestRate.sort(Comparator.comparingInt(SlowRequestRateModel::getMonth).reversed());
+
+        String slowRequestRateThisMonth = TableUtils.getPercentageFormatDouble(gatewayAverageSlowRequestRate.get(0).getSlowRequestRate());
         // 生成报告
-        String reportTemplate = "@所有人\n%d月慢请求率概况：\n--月均值：6.88%%\n--本周（%s）大盘均值：6.93%%\n%s%s请以上接口负责人提供性能恶化的原因，并推进相关治理措施。\n本周数据明细详见 ：https://wiki.tuhu.cn/pages/viewpage.action?pageId=587414655";
-        String report = String.format(reportTemplate, monthValue, dateRange, criticalIssues, otherIssues);
+        String reportTemplate = "@所有人\n%d月(cl-gateway)网关慢请求率概况：\n--月均值：%s\n--本周（%s）大盘均值：%s\n%s%s请以上接口负责人提供性能恶化的原因，并推进相关治理措施。\n本周数据明细详见 ：https://wiki.tuhu.cn/pages/viewpage.action?pageId=587414655";
+        String report = String.format(reportTemplate, monthValue, slowRequestRateThisMonth, dateRange, averageSlowRequestRateInThePastWeek, criticalIssues, otherIssues);
 
         setText(document, report);
     }
@@ -274,6 +282,17 @@ public class ReportGenerationService {
                 .forEach(url -> joiner.add(
                         String.format("【%s】%s\n 99线变化：%dms  @%s",
                                 url.getPageName(), url.getUrl(), url.getP99Change(), url.getOwner())
+                ));
+        return joiner.toString();
+    }
+
+    private String collectNonCompliantCriticalLinkUrls(List<UrlPerformanceResponse> urlList, String header) {
+        StringJoiner joiner = new StringJoiner("\n", header + "\n", "\n");
+        urlList.stream()
+                .filter(url -> !url.getReachTarget())
+                .forEach(url -> joiner.add(
+                        String.format("【%s】%s\n 99线：%dms   99线基线目标：%dms  @%s",
+                                url.getPageName(), url.getUrl(), url.getThisWeekP99(), url.getP99Target(), url.getOwner())
                 ));
         return joiner.toString();
     }
