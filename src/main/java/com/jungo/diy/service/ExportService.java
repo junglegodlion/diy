@@ -1,6 +1,7 @@
 package com.jungo.diy.service;
 
 import com.jungo.diy.response.UrlPerformanceResponse;
+import com.jungo.diy.util.DateUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -15,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+
+import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
 /**
  * @author lichuang3
@@ -41,8 +44,7 @@ public class ExportService {
 
             // 获取当天日期并格式化为 yyyy-MM-dd 格式
             LocalDate currentDate = LocalDate.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String formattedDate = currentDate.format(formatter);
+            String formattedDate = DateUtils.getDateString(currentDate, YYYY_MM_DD);
             String fileName = URLEncoder.encode(formattedDate + "_performance.xlsx", StandardCharsets.UTF_8.toString());
             response.setHeader("Content-disposition", "attachment;filename=" + fileName);
 

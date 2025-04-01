@@ -7,6 +7,7 @@ import com.jungo.diy.model.PerformanceFileModel;
 import com.jungo.diy.model.PerformanceFolderModel;
 import com.jungo.diy.repository.PerformanceRepository;
 import com.jungo.diy.util.CsvUtils;
+import com.jungo.diy.util.DateUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -102,6 +104,7 @@ public class FileReaderService {
 
         // 将性能数据写入数据库
         writeDataToDatabase(performanceFolderModel);
+        log.info("FileReaderService#readTargetFiles,成功将性能数据写入数据库！文件名为：{}", directoryName);
         return "success";
     }
 
@@ -245,5 +248,16 @@ public class FileReaderService {
         }
 
         return null;
+    }
+
+    public Object getMultiFile(String startDirectoryName, String endDirectoryName) {
+        LocalDate startDate = DateUtils.getLocalDate(startDirectoryName, DateUtils.YYYY_MM_DD);
+        LocalDate endDate = DateUtils.getLocalDate(endDirectoryName, DateUtils.YYYY_MM_DD);
+        // 遍历日期范围
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            String formattedDate = DateUtils.getDateString(date, DateUtils.YYYY_MM_DD);
+            readTargetFiles(formattedDate);
+        }
+        return "success";
     }
 }

@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.jungo.diy.util.DateUtils.YYYY_MM;
+import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
 /**
  * @author lichuang3
@@ -100,13 +101,7 @@ public class AnalysisService {
     private P99Model getP99Model(ApiDailyPerformanceEntity apiDailyPerformanceEntity) {
         P99Model p99Model = new P99Model();
         Date date = apiDailyPerformanceEntity.getDate();
-        // 将 Date 对象转换为 LocalDate 对象
-        Instant instant = date.toInstant();
-        LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-        // 定义日期格式
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        // 将 LocalDate 对象转换为字符串
-        String dateString = localDate.format(formatter);
+        String dateString = DateUtils.getDateString(date, YYYY_MM_DD);
         p99Model.setDate(dateString);
         p99Model.setP99(apiDailyPerformanceEntity.getP99());
         return p99Model;
@@ -117,13 +112,8 @@ public class AnalysisService {
         for (GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity : gateWayDailyPerformanceEntities) {
             P99Model p99Model = new P99Model();
             Date date = gateWayDailyPerformanceEntity.getDate();
-            // 将 Date 对象转换为 LocalDate 对象
-            Instant instant = date.toInstant();
-            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-            // 定义日期格式
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             // 将 LocalDate 对象转换为字符串
-            String dateString = localDate.format(formatter);
+            String dateString = DateUtils.getDateString(date, YYYY_MM_DD);
             p99Model.setDate(dateString);
             p99Model.setPeriod(gateWayDailyPerformanceEntity.getWeekNumber());
             p99Model.setP99(gateWayDailyPerformanceEntity.getP99());
@@ -301,8 +291,7 @@ public class AnalysisService {
 
             /* 生成文件路径并保存到本地 */
             LocalDate currentDate = LocalDate.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String formattedDate = currentDate.format(formatter);
+            String formattedDate = DateUtils.getDateString(currentDate, YYYY_MM_DD);
             String fileName = URLEncoder.encode(formattedDate + "_chart.xlsx", StandardCharsets.UTF_8.toString());
             String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/图表";
             String filePath = directoryPath + "/" + fileName;
@@ -458,12 +447,8 @@ public class AnalysisService {
             GateWayDailyPerformanceEntity gateWayDailyPerformanceEntity = performanceByYear.get(i);
             row.createCell(0).setCellValue(gateWayDailyPerformanceEntity.getHost());
             Date date = gateWayDailyPerformanceEntity.getDate();
-            Instant instant = date.toInstant();
-            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-            // 定义日期格式
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             // 将 LocalDate 对象转换为字符串
-            String dateString = localDate.format(formatter);
+            String dateString = DateUtils.getDateString(date, YYYY_MM_DD);
             row.createCell(1).setCellValue(dateString);
             row.createCell(2).setCellValue(gateWayDailyPerformanceEntity.getP999());
             row.createCell(3).setCellValue(gateWayDailyPerformanceEntity.getP99());
@@ -558,13 +543,7 @@ public class AnalysisService {
         for (GateWayDailyPerformanceEntity performance : performanceByYear) {
             SlowRequestRateModel slowRequestRateModel = new SlowRequestRateModel();
             Date date = performance.getDate();
-            // 将 Date 对象转换为 LocalDate 对象
-            Instant instant = date.toInstant();
-            LocalDate localDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-            // 定义日期格式
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            // 将 LocalDate 对象转换为字符串
-            String dateString = localDate.format(formatter);
+            String dateString = DateUtils.getDateString(date, YYYY_MM_DD);
             slowRequestRateModel.setDate(dateString);
             slowRequestRateModel.setPeriod(performance.getWeekNumber());
             slowRequestRateModel.setSlowRequestRate(performance.getSlowRequestRate());
