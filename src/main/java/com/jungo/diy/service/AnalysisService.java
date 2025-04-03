@@ -603,7 +603,11 @@ public class AnalysisService {
      * 生成 Excel Sheet 名称，防止超长
      */
     private String generateSheetName(String token) {
-        String name = token.substring(token.lastIndexOf("/") + 1);
+        String[] parts = token.split("/");
+        String name = "";
+        if (parts.length >= 2) {
+            name = parts[parts.length - 2] + "_" + parts[parts.length - 1];
+        }
         return name.length() > 31 ? name.substring(0, 28) + "..." : name;
     }
 
