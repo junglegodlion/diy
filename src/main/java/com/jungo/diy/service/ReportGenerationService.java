@@ -239,8 +239,7 @@ public class ReportGenerationService {
         // 处理核心接口（关键路径）
         String criticalIssues = collectNonCompliantCriticalLinkUrls(
                 result.getCriticalLinkUrlPerformanceResponses(),
-                String.format("一、核心接口（关键路径）需重点关注：%s日\n", endDate.format(formatter))
-        );
+                "");
 
         // 处理其他性能恶化的接口
         List<UrlPerformanceResponse> otherIssuesResponses = Stream.of(
@@ -253,8 +252,9 @@ public class ReportGenerationService {
 
         String otherIssues = collectNonCompliantUrls(
                 otherIssuesResponses,
-                String.format("二、其他性能恶化的接口( %s 对比，99 线增加超 30ms，且环比增幅超 10%%)：\n", dateRange)
+                ""
         );
+
 
         // 取出大盘慢请求均值
         String averageSlowRequestRateInThePastWeek = TableUtils.getPercentageFormatDouble(result.getAverageSlowRequestRateInThePastWeek());
@@ -264,11 +264,15 @@ public class ReportGenerationService {
         gatewayAverageSlowRequestRate.sort(Comparator.comparingInt(SlowRequestRateModel::getMonth).reversed());
 
         String slowRequestRateThisMonth = TableUtils.getPercentageFormatDouble(gatewayAverageSlowRequestRate.get(0).getSlowRequestRate());
+        String monthlySummaryTemplate = "@所有人\n%d月(cl-gateway)网关慢请求率概况：\n--月均值：%s\n--本周（%s）大盘均值：%s\n";
+        String monthlySummary = String.format(monthlySummaryTemplate, monthValue, slowRequestRateThisMonth, dateRange, averageSlowRequestRateInThePastWeek);
+        setText(document, monthlySummary);
+        setSecondLevelTitle(document, String.format("3.1 核心接口（关键路径）未达标 需重点关注：%s日\n", endDate.format(formatter)));
+        setText(document, criticalIssues);
+        setSecondLevelTitle(document, String.format("3.2 其他性能恶化的接口( %s 对比，99 线增加超 30ms，且环比增幅超 10%%)：\n", dateRange));
+        setText(document, otherIssues);
         // 生成报告
-        String reportTemplate = "@所有人\n%d月(cl-gateway)网关慢请求率概况：\n--月均值：%s\n--本周（%s）大盘均值：%s\n%s%s请以上接口负责人提供性能恶化的原因，并推进相关治理措施。\n本周数据明细详见 ：https://wiki.tuhu.cn/pages/viewpage.action?pageId=587414655";
-        String report = String.format(reportTemplate, monthValue, slowRequestRateThisMonth, dateRange, averageSlowRequestRateInThePastWeek, criticalIssues, otherIssues);
-
-        setText(document, report);
+        setText(document, "请以上接口负责人提供性能恶化的原因，并推进相关治理措施。\n本周数据明细详见 ：");
     }
 
 
