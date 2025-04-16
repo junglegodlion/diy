@@ -1,12 +1,18 @@
 package com.jungo.diy.controller;
 
+import com.jungo.diy.entity.CoreInterfaceConfigEntity;
 import com.jungo.diy.model.ExcelModel;
 import com.jungo.diy.model.SheetModel;
+import com.jungo.diy.request.CoreInterfaceConfigRequest;
 import com.jungo.diy.service.CoreInterfaceConfigService;
 import com.jungo.diy.service.FileService;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,7 +45,11 @@ public class CoreInterfaceConfigController {
         coreInterfaceConfigService.write2DB(data);
     }
 
-
-
+    @ApiOperation(value = "插入核心接口配置", notes = "将传入的核心接口配置信息插入到数据库中")
+    @PostMapping("/insert")
+    public String insert(@RequestBody CoreInterfaceConfigRequest request){
+        int result = coreInterfaceConfigService.insert(request);
+        return result > 0 ? "success" : "fail";
+    }
 
 }

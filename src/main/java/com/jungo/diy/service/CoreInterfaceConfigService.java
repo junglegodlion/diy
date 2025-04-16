@@ -2,6 +2,7 @@ package com.jungo.diy.service;
 
 import com.jungo.diy.entity.CoreInterfaceConfigEntity;
 import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
+import com.jungo.diy.request.CoreInterfaceConfigRequest;
 import com.jungo.diy.util.TableUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,5 +54,24 @@ public class CoreInterfaceConfigService {
             coreInterfaceConfigEntities.add(coreInterfaceConfigEntity);
         }
         return coreInterfaceConfigEntities;
+    }
+
+    public int insert(CoreInterfaceConfigRequest request) {
+        CoreInterfaceConfigEntity coreInterfaceConfigEntity = new CoreInterfaceConfigEntity();
+        coreInterfaceConfigEntity.setPageName(request.getPageName());
+        coreInterfaceConfigEntity.setInterfaceUrl(request.getInterfaceUrl());
+        coreInterfaceConfigEntity.setHost(request.getHost());
+        coreInterfaceConfigEntity.setP99Target(request.getP99Target());
+        coreInterfaceConfigEntity.setSlowRequestRateTarget(request.getSlowRequestRateTarget());
+        coreInterfaceConfigEntity.setInterfaceType(request.getInterfaceType());
+        coreInterfaceConfigEntity.setSortOrder(request.getSortOrder());
+        coreInterfaceConfigEntity.setOwner(request.getOwner());
+
+        int result = coreInterfaceConfigMapper.insert(coreInterfaceConfigEntity);
+        if (result > 0) {
+            return 1;
+        } else {
+            return 0;
+        }
     }
 }

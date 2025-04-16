@@ -25,11 +25,11 @@
     <insert id="insert" parameterType="com.jungo.diy.entity.CoreInterfaceConfigEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO core_interface_config (
             page_name, interface_url, p99_target, slow_request_rate_target,
-            interface_type, sort_order, owner, is_deleted, create_time, update_time
+            interface_type, sort_order, owner
         )
         VALUES (
                    #{pageName}, #{interfaceUrl}, #{p99Target}, #{slowRequestRateTarget},
-                   #{interfaceType}, #{sortOrder}, #{owner}, #{isDeleted}, #{createTime}, #{updateTime}
+                   #{interfaceType}, #{sortOrder}, #{owner}
                )
     </insert>
 

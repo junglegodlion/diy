@@ -32,22 +32,22 @@ public class ExtInterceptor implements HandlerInterceptor {
         });
 
         // 2. 处理JSON Body（需配合@RequestBody使用）
-        if(request.getContentType()  != null &&
-           request.getContentType().contains("application/json"))  {
-            try {
-                BufferedReader reader = request.getReader();
-                String jsonBody = reader.lines().collect(Collectors.joining());
-                JsonNode rootNode = new ObjectMapper().readTree(jsonBody);
-               
-                if(rootNode.has("ext"))  {
-                    rootNode.get("ext").fields().forEachRemaining(entry  -> {
-                        extParams.put(entry.getKey(),  entry.getValue().asText());
-                    });
-                }
-            } catch (IOException e) {
-                // 异常处理逻辑
-            }
-        }
+        // if(request.getContentType()  != null &&
+        //    request.getContentType().contains("application/json"))  {
+        //     try {
+        //         BufferedReader reader = request.getReader();
+        //         String jsonBody = reader.lines().collect(Collectors.joining());
+        //         JsonNode rootNode = new ObjectMapper().readTree(jsonBody);
+        //
+        //         if(rootNode.has("ext"))  {
+        //             rootNode.get("ext").fields().forEachRemaining(entry  -> {
+        //                 extParams.put(entry.getKey(),  entry.getValue().asText());
+        //             });
+        //         }
+        //     } catch (IOException e) {
+        //         // 异常处理逻辑
+        //     }
+        // }
 
         // 设置到线程上下文
         if(!extParams.isEmpty())  {
