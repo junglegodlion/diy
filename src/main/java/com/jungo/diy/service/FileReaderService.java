@@ -82,10 +82,15 @@ public class FileReaderService {
 
         try (Stream<Path> paths = Files.list(dirPath)) {
             paths.filter(Files::isRegularFile)
-                    .limit(4)
+                    .limit(5)
                     .forEach(path -> {
                         try {
                             String fileName = path.getFileName().toString();
+                            // 检查文件名是否包含.csv后缀
+                            if (!fileName.endsWith(".csv")) {
+                                log.warn("FileReaderService#readTargetFiles,文件{}不是.csv文件，跳过！", fileName);
+                                return;
+                            }
                             // fileName去除.csv后缀
                             fileName = fileName.substring(0, fileName.length() - 4);
                             PerformanceFileModel performanceFileModel = new PerformanceFileModel();
