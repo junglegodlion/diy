@@ -62,6 +62,22 @@ public class CsvUtils {
         return newData;
     }
 
+    public static List<List<String>> getDataFromInputStream(InputStream inputStream) {
+        List<List<String>> data = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            CSVParser parser = CSVFormat.DEFAULT.parse(reader);
+            for (CSVRecord record : parser) {
+                List<String> row = new ArrayList<>();
+                record.forEach(row::add);
+                data.add(row);
+            }
+        } catch (IOException e) {
+            log.error("CsvUtils#getData,出现异常！", e);
+        }
+        return data;
+    }
+
+
     /**
      * 根据目录名日期判断是否需要修改原始集合，若目录日期早于阈值则在头部添加主机名
      *
@@ -117,9 +133,6 @@ public class CsvUtils {
         return Pattern.compile(regex).matcher(input).find();
     }
 
-    public static String cleanSpecialQuotes(String input) {
-        return StringUtils.strip(input, "\"");
-    }
     /**
      * 读取 CSV 为 List<Map>（首行为表头）
      */
