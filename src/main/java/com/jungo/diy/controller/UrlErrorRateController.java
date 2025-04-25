@@ -3,21 +3,35 @@ package com.jungo.diy.controller;
 import com.jungo.diy.model.ExcelModel;
 import com.jungo.diy.model.SheetModel;
 import com.jungo.diy.model.UrlStatusErrorModel;
+import com.jungo.diy.service.AnalysisService;
 import com.jungo.diy.util.CsvUtils;
+import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.JsonUtils;
+import com.jungo.diy.util.TableUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import static com.jungo.diy.service.AnalysisService.createP99ModelSheet;
+import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
 /**
  * @author lichuang3
@@ -29,7 +43,14 @@ import java.util.stream.Collectors;
 public class UrlErrorRateController {
 
     @PostMapping("/upload/statusError")
-    public void readFile(@RequestParam("file") MultipartFile file) throws IOException {
+    public String readFile(@RequestParam("file") MultipartFile file) throws IOException {
+        String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/";
+        File directory = new File(directoryPath);
+        if (!directory.exists()) {
+            // 创建所有必要的目录
+            directory.mkdirs();
+        }
+
         List<List<String>> listList = CsvUtils.getDataFromInputStream(file.getInputStream());
         List<UrlStatusErrorModel> urlStatusErrorModels = new ArrayList<>();
         for (int i = 1; i < listList.size(); i++) {
@@ -84,11 +105,58 @@ public class UrlErrorRateController {
         urlList.add("/cl-maint-order-create/order/getConfirmOrderData");
 
         // 将newUrlStatusErrorModels按照url排序，url按照urlList的顺序排序,如果url相同，再按照status排序
-        List<UrlStatusErrorModel> sortedUrlStatusErrorModels = newUrlStatusErrorModels.stream()
-                .sorted(Comparator.comparingInt(o -> urlList.indexOf(o.getUrl())))
-                .sorted(Comparator.comparingInt(UrlStatusErrorModel::getStatus))
-                .collect(Collectors.toList());
+        newUrlStatusErrorModels.sort((model1, model2) -> {
+            int index1 = urlList.indexOf(model1.getUrl());
+            int index2 = urlList.indexOf(model2.getUrl());
+            if (index1 != index2) {
+                return Integer.compare(index1, index2);
+            }
+            return Integer.compare(model1.getStatus(), model2.getStatus());
+        });
 
-        System.out.println(JsonUtils.objectToJson(sortedUrlStatusErrorModels));
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+
+            // 定义 Sheet 名称和数据列表
+            XSSFSheet sheet = workbook.createSheet("状态码错误率");
+            String[] columnTitles = {"host", "url", "status", "请求总数", "占比", "非200占比"};
+
+            TableUtils.createChartData(workbook, sheet, newUrlStatusErrorModels, columnTitles, (model, columnIndex, cell) -> {
+                switch (columnIndex) {
+                    case 0:
+                        cell.setCellValue(model.getHost());
+                        break;
+                    case 1:
+                        cell.setCellValue(model.getUrl());
+                        break;
+                    case 2:
+                        cell.setCellValue(model.getStatus());
+                        break;
+                    case 3:
+                        cell.setCellValue(model.getTotalCount());
+                        break;
+                    case 4:
+                        cell.setCellValue(model.getPercentRate());
+                        break;
+                    case 5:
+                        cell.setCellValue(model.getNot200errorRate());
+                        break;
+                }
+            });
+
+
+            String fileName = URLEncoder.encode("httpError.xlsx", StandardCharsets.UTF_8.toString());
+            saveWorkbookToFile(workbook, directoryPath, fileName);
+        }
+        return "ok";
+    }
+
+
+    private void saveWorkbookToFile(XSSFWorkbook workbook, String directoryPath, String fileName) {
+        String filePath = directoryPath + "/" + fileName;
+        try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
+            workbook.write(fileOut);
+        } catch (IOException e) {
+            log.error("文件保存失败 | 路径: {} | 错误: {}", filePath, e.getMessage(), e);
+        }
     }
 }

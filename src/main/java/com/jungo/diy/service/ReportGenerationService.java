@@ -594,10 +594,10 @@ public class ReportGenerationService {
 
 
     // 新增通用表格生成方法
-    private <T> void drawTable(XWPFDocument document,
-                               List<T> data,
-                               String[] headers,
-                               BiConsumer<XWPFTableRow, T> rowDataSetter) {
+    public <T> void drawTable(XWPFDocument document,
+                              List<T> data,
+                              String[] headers,
+                              BiConsumer<XWPFTableRow, T> rowDataSetter) {
         int rows = data.size();
         int cols = headers.length;
         XWPFTable table = TableUtils.createXwpfTable(document, rows + 1, cols);
