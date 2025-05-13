@@ -118,7 +118,7 @@ public class UrlErrorRateController {
 
             // 定义 Sheet 名称和数据列表
             XSSFSheet sheet = workbook.createSheet("状态码错误率");
-            String[] columnTitles = {"host", "url", "status", "请求总数", "占比", "非200占比"};
+            String[] columnTitles = {"host", "url", "status", "请求次数", "请求总数", "占比", "非200占比"};
 
             TableUtils.createChartData(workbook, sheet, newUrlStatusErrorModels, columnTitles, (model, columnIndex, cell) -> {
                 switch (columnIndex) {
@@ -132,12 +132,15 @@ public class UrlErrorRateController {
                         cell.setCellValue(model.getStatus());
                         break;
                     case 3:
-                        cell.setCellValue(model.getTotalCount());
+                        cell.setCellValue(model.getCount());
                         break;
                     case 4:
-                        cell.setCellValue(model.getPercentRate());
+                        cell.setCellValue(model.getTotalCount());
                         break;
                     case 5:
+                        cell.setCellValue(model.getPercentRate());
+                        break;
+                    case 6:
                         cell.setCellValue(model.getNot200errorRate());
                         break;
                 }
