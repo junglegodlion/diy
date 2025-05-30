@@ -229,6 +229,13 @@ public class FileReaderService {
             return false;
         }
 
+        // 判断字符是否大于255个字符
+        int byteLength = path.getBytes(StandardCharsets.UTF_8).length;
+        if (byteLength > 255) {
+            log.error("FileReaderService#checkUrl,出现异常！字符数大于255，{}", path);
+            return false;
+        }
+
         // 1. 去除首部斜杠（适配不同路径格式）
         String trimmedPath = path.startsWith("/")  ? path.substring(1)  : path;
 
