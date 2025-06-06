@@ -584,9 +584,11 @@ public class AnalysisService {
         // 并行获取数据，使用 ConcurrentHashMap 避免线程安全问题
         Map<String, List<P99Model>> urlMap = Arrays.stream(tokens)
                 .parallel()
-                .collect(Collectors.toConcurrentMap(
+                .collect(Collectors.toMap(
                         token -> token,
-                        token -> extractP99Data(token, startDate, now)
+                        token -> extractP99Data(token, startDate, now),
+                        (oldValue, newValue) -> oldValue,
+                        LinkedHashMap::new
                 ));
 
         // 创建 Excel 工作簿
