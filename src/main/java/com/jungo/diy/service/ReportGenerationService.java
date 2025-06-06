@@ -28,6 +28,9 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.format.DateTimeFormatter;
@@ -90,26 +93,53 @@ public class ReportGenerationService {
     private AnalysisService analysisService;
 
     public String generateWordDocument(LocalDate startDate, LocalDate endDate) throws IOException, InvalidFormatException {
-        // 新建目录，将文件保存在改目录下
-        LocalDate currentDate = LocalDate.now();
-        String formattedDate = DateUtils.getDateString(currentDate, YYYY_MM_DD);
-        String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/" + formattedDate;
-        File directory = new File(directoryPath);
-        if (!directory.exists()) {
-            // 创建所有必要的目录
-            directory.mkdirs();
-        }
+        validateDateRange(startDate, endDate);
 
+        Path outputDir = prepareOutputDirectory();
         PerformanceResult result = analysisService.getPerformanceResult(startDate, endDate);
-        // 生成网关性能变化曲线图
-        generateGateWayPerformanceCurveChart(endDate, directoryPath);
-        // 未达标接口性能曲线图
-        generateTrendChartNonCompliantInterfaces(result, endDate, directoryPath);
-        // 生成word文档
-        generateWord(startDate, endDate, result, directoryPath);
 
-        return directoryPath;
+        generateAllCharts(result, endDate, outputDir);
+        generateReportDocument(startDate, endDate, result, outputDir);
+
+        return outputDir.toString();
     }
+
+    private Path prepareOutputDirectory() throws IOException {
+        Path desktopPath = Paths.get(System.getProperty("user.home"), "Desktop");
+        Path outputPath = desktopPath.resolve("备份/c端网关接口性能统计/数据统计/输出")
+                .resolve(LocalDate.now().format(DateTimeFormatter.ISO_DATE));
+
+        Files.createDirectories(outputPath);
+        return outputPath;
+    }
+
+
+    private void validateDateRange(LocalDate start, LocalDate end) {
+        if (start.isAfter(end)) {
+            throw new IllegalArgumentException("开始日期不能晚于结束日期");
+        }
+    }
+
+    private void generateAllCharts(PerformanceResult result, LocalDate endDate, Path outputDir) {
+        try {
+            generateGateWayPerformanceCurveChart(endDate, outputDir.toString());
+            generateTrendChartNonCompliantInterfaces(result, endDate, outputDir.toString());
+        } catch (IOException e) {
+            throw new RuntimeException("图表生成失败", e);
+        }
+    }
+
+    private void generateReportDocument(LocalDate startDate,
+                                        LocalDate endDate,
+                                        PerformanceResult result,
+                                        Path outputDir) {
+        try {
+            generateWord(startDate, endDate, result, outputDir.toString());
+        } catch (IOException e) {
+            throw new RuntimeException("文档生成失败", e);
+        }
+    }
+
 
     private void generateTrendChartNonCompliantInterfaces(PerformanceResult result, LocalDate endDate, String directoryPath) {
         LocalDate startDateForMonthPerformanceTrend = endDate.minusDays(30);
