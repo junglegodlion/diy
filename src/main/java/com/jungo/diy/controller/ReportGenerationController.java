@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,16 +31,17 @@ public class ReportGenerationController {
 
     @ApiOperation(value = "为给定的日期范围生成Word文档", response = String.class)
     @GetMapping("/generate-word")
-    public String generateWord(@ApiParam(value = "以yyyy-MM-dd格式表示的结束日期", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
+    public ResponseEntity<String> generateWord(@ApiParam(value = "以yyyy-MM-dd格式表示的结束日期", required = true) @RequestParam("endDate") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate endDate) {
         try {
             LocalDate startDate = endDate.minusDays(7);
             String filePath = reportGenerationService.generateWordDocument(startDate, endDate);
-            return "Word文档生成成功，路径：" + filePath;
+            return ResponseEntity.ok("Word文档生成成功，路径：" + filePath);
         } catch (IOException e) {
-            log.error("WordController#generateWord,出现异常！", e);
-            return "Word文档生成失败：" + e.getMessage();
+            log.error("Word文档生成失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Word文档生成失败：" + e.getMessage());
         } catch (InvalidFormatException e) {
-            throw new RuntimeException(e);
+            log.error("文档格式错误", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("文档格式错误：" + e.getMessage());
         }
     }
 }
