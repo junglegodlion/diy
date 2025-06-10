@@ -2,6 +2,7 @@ package com.jungo.diy.controller;
 
 import com.jungo.diy.model.BusinessStatusErrorModel;
 import com.jungo.diy.model.UrlStatusErrorModel;
+import com.jungo.diy.test.ElasticsearchQuery;
 import com.jungo.diy.util.CsvUtils;
 import com.jungo.diy.util.TableUtils;
 import io.swagger.annotations.ApiParam;
@@ -24,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -154,6 +156,16 @@ public class UrlErrorRateController {
             }
             return Float.compare(model1.getErrorRate(), model2.getErrorRate());
         });
+
+        // 替换ext-website-cl-maint-api：/maintMainline/getBasicMaintainData的错误率
+
+        businessStatusErrorModels.stream()
+                .filter(x -> x.getUrl().equals("/maintMainline/getBasicMaintainData"))
+                .filter(Objects::nonNull).findFirst().ifPresent(x ->
+                {
+                    int total = ElasticsearchQuery.getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData");
+                    x.setErrorRequests(total);
+                });
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
 
             // 定义 Sheet 名称和数据列表

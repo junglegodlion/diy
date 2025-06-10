@@ -6,6 +6,11 @@ import kong.unirest.Unirest;
 import kong.unirest.json.JSONArray;
 import kong.unirest.json.JSONObject;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,8 +28,14 @@ public class ElasticsearchQuery {
     }};
 
     public static void main(String[] args) {
+        int total = getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData");
+        System.out.println(total);
+        // 输出结果
+    }
+
+    public static int getTotal(String appId, String url) {
         String baseUrl = "https://int-service-elk.tuhuyun.cn/elasticsearch/logstash-int-service-server-side-log-*/_search";
-        
+
         // 查询参数
         Map<String, Object> queryParams = new HashMap<>();
         queryParams.put("rest_total_hits_as_int", true);
@@ -33,24 +44,45 @@ public class ElasticsearchQuery {
         queryParams.put("preference", System.currentTimeMillis());
         queryParams.put("timeout", "30000ms");
 
+        // 获取当前日期并减去一天
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+
+        // 设置开始时间(00:00:00)
+        LocalDateTime start = yesterday.atStartOfDay();
+        // 设置结束时间(23:59:59.999)
+        LocalDateTime end = yesterday.atTime(23, 59, 59, 999000000);
+
+        // 转换为UTC时区并格式化为字符串
+        String startTime = ZonedDateTime.of(start, ZoneId.systemDefault())
+                .withZoneSameInstant(ZoneId.of("UTC"))
+                .format(DateTimeFormatter.ISO_INSTANT);
+
+        String endTime = ZonedDateTime.of(end, ZoneId.systemDefault())
+                .withZoneSameInstant(ZoneId.of("UTC"))
+                .format(DateTimeFormatter.ISO_INSTANT);
+
         // 构建请求体
         JSONObject requestBody = buildRequestBody(
-            "ext-website-cl-maint-api", 
-            "/maintMainline/getBasicMaintainData",
-            "2025-06-08T16:00:00.000Z", 
-            "2025-06-09T15:59:59.999Z"
+                appId,
+                url,
+                startTime,
+                endTime
         );
 
         // 执行查询
         HttpResponse<JsonNode> response = executeQuery(baseUrl, queryParams, requestBody);
-
-        // 输出结果
-        System.out.println("Status: " + response.getStatus());
-        System.out.println("Response: " + response.getBody().toPrettyString());
+        // 获取hits.total字段的值
+        JsonNode body = response.getBody();
+        JSONObject object = body.getObject();
+        JSONObject hits = object.getJSONObject("hits");
+        int total = hits.getInt("total");
+        return total;
     }
 
-    private static JSONObject buildRequestBody(String appId, String targetUrl,
-                                               String startTime, String endTime) {
+    private static JSONObject buildRequestBody(String appId,
+                                               String targetUrl,
+                                               String startTime,
+                                               String endTime) {
         // 时间范围条件
         JSONObject range = new JSONObject();
         range.put("gte", startTime);
