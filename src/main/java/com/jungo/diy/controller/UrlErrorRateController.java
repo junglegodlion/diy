@@ -35,18 +35,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/urlErrorRate")
 public class UrlErrorRateController {
 
-    @PostMapping("/upload/businessError")
-    public String readCodeFile(@RequestParam("code") MultipartFile file) throws IOException {
-        if (file.isEmpty()) {
-            throw new IllegalArgumentException("文件为空");
-        }
-
-        List<BusinessStatusErrorModel> businessStatusErrorModels = getBusinessStatusErrorModels(file);
-
-
-        return "ok";
-    }
-
     private static List<BusinessStatusErrorModel> getBusinessStatusErrorModels(MultipartFile file) throws IOException {
         List<BusinessStatusErrorModel> businessStatusErrorModels = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
@@ -70,10 +58,10 @@ public class UrlErrorRateController {
 
     @PostMapping("/upload/statusError")
     public String readFile(@ApiParam(value = "accesslog", required = true)
-                           @RequestParam("file1") MultipartFile file1,
+                           @RequestParam("accesslogFile") MultipartFile accesslogFile,
 
                            @ApiParam(value = "code", required = true)
-                           @RequestParam("file2") MultipartFile file2) throws IOException {
+                           @RequestParam("codeFile") MultipartFile codeFile) throws IOException {
         String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/";
         File directory = new File(directoryPath);
         if (!directory.exists()) {
@@ -81,7 +69,7 @@ public class UrlErrorRateController {
             directory.mkdirs();
         }
 
-        List<List<String>> listList = CsvUtils.getDataFromInputStream(file1.getInputStream());
+        List<List<String>> listList = CsvUtils.getDataFromInputStream(accesslogFile.getInputStream());
         List<UrlStatusErrorModel> urlStatusErrorModels = new ArrayList<>();
         for (int i = 1; i < listList.size(); i++) {
             List<String> list = listList.get(i);
@@ -143,7 +131,7 @@ public class UrlErrorRateController {
             }
             return Integer.compare(model1.getStatus(), model2.getStatus());
         });
-        List<BusinessStatusErrorModel> businessStatusErrorModels = getBusinessStatusErrorModels(file2);
+        List<BusinessStatusErrorModel> businessStatusErrorModels = getBusinessStatusErrorModels(codeFile);
         List<String> urlList2 = new ArrayList<>();
         urlList2.add("/tireListModule/getTireList");
         urlList2.add("/maintMainline/getBasicMaintainData");
