@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,10 +26,12 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author lichuang3
@@ -38,6 +41,47 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequestMapping("/urlErrorRate")
 public class UrlErrorRateController {
+
+    private static final String[] STATUS_CODE_URLS = {
+            "/cl-tire-site/tireListModule/getTireList",
+            "/cl-maint-api/maintMainline/getBasicMaintainData",
+            "/cl-maint-mainline/mainline/getDynamicData",
+            "/cl-oto-front-api/batteryList/getBatteryList",
+            "/mlp-product-search-api/module/search/pageList",
+            "/mlp-product-search-api/main/search/api/mainProduct",
+            "/ext-website-cl-beauty-api/channelPage/v4/getBeautyHomeShopListAndRecommendLabel",
+            "/cl-product-components/GoodsDetail/detailModuleInfo",
+            "/cl-tire-site/tireModule/getTireDetailModuleData",
+            "/cl-maint-mainline/productMainline/getMaintProductDetailInfo",
+            "/cl-product-components/GoodsDetail/productDetailModularInfoForBff",
+            "/cl-ordering-aggregator/ordering/getOrderConfirmFloatLayerData",
+            "/cl-maint-order-create/order/getConfirmOrderData"
+    };
+
+    private static final String[] BUSINESS_ERROR_URLS = {
+            "/tireListModule/getTireList",
+            "/maintMainline/getBasicMaintainData",
+            "/mainline/getDynamicData",
+            "/batteryList/getBatteryList",
+            "/module/search/pageList",
+            "/main/search/api/mainProduct",
+            "/channelPage/v4/getBeautyHomeShopListAndRecommendLabel",
+            "/GoodsDetail/detailModuleInfo",
+            "/getTireDetailModuleData",
+            "/productMainline/getMaintProductDetailInfo",
+            "/GoodsDetail/productDetailModularInfoForBff",
+            "/ordering/getOrderConfirmFloatLayerData",
+            "/order/getConfirmOrderData"
+    };
+
+    private static final String OUTPUT_DIRECTORY = System.getProperty("user.home") +
+            "/Desktop/备份/c端网关接口性能统计/数据统计/输出/";
+    private static final String[] STATUS_COLUMN_TITLES = {
+            "host", "url", "status", "请求次数", "请求总数", "占比", "非200占比"
+    };
+    private static final String[] BUSINESS_COLUMN_TITLES = {
+            "服务名称", "接口路径", "总请求量", "非10000请求量", "占比"
+    };
 
     private static List<BusinessStatusErrorModel> getBusinessStatusErrorModels(MultipartFile file) throws IOException {
         List<BusinessStatusErrorModel> businessStatusErrorModels = new ArrayList<>();
@@ -60,8 +104,130 @@ public class UrlErrorRateController {
         return businessStatusErrorModels;
     }
 
+    private void ensureDirectoryExists(String path) throws IOException {
+        File directory = new File(path);
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException("无法创建目录: " + path);
+        }
+    }
+
+    private List<UrlStatusErrorModel> processAccesslogFile(MultipartFile file) throws IOException {
+        List<List<String>> csvData = CsvUtils.getDataFromInputStream(file.getInputStream());
+
+        return csvData.stream()
+                .skip(1)
+                .map(this::mapToUrlStatusErrorModel)
+                .collect(Collectors.groupingBy(UrlStatusErrorModel::getUrl))
+                .entrySet().stream()
+                .flatMap(this::processUrlStatusGroup)
+                .sorted(this::compareUrlStatusModels)
+                .collect(Collectors.toList());
+    }
+
+    private int compareUrlStatusModels(UrlStatusErrorModel m1, UrlStatusErrorModel m2) {
+        int index1 = Arrays.asList(STATUS_CODE_URLS).indexOf(m1.getUrl());
+        int index2 = Arrays.asList(STATUS_CODE_URLS).indexOf(m2.getUrl());
+        return index1 != index2 ? Integer.compare(index1, index2) :
+                Integer.compare(m1.getStatus(), m2.getStatus());
+    }
+
+    private Stream<UrlStatusErrorModel> processUrlStatusGroup(
+            Map.Entry<String, List<UrlStatusErrorModel>> entry) {
+
+        List<UrlStatusErrorModel> models = entry.getValue();
+        int totalCount = models.stream().mapToInt(UrlStatusErrorModel::getCount).sum();
+        int not200Count = models.stream()
+                .filter(m -> m.getStatus() != 200)
+                .mapToInt(UrlStatusErrorModel::getCount)
+                .sum();
+
+        return models.stream().peek(m -> {
+            m.setTotalCount(totalCount);
+            m.setNot200Count(not200Count);
+        });
+    }
+
+    private UrlStatusErrorModel mapToUrlStatusErrorModel(List<String> row) {
+        UrlStatusErrorModel model = new UrlStatusErrorModel();
+        model.setHost(row.get(0));
+        model.setUrl(row.get(1));
+        model.setStatus(Integer.parseInt(row.get(2)));
+        model.setCount(Integer.parseInt(row.get(3)));
+        return model;
+    }
+
+    private List<BusinessStatusErrorModel> processCodeFile(MultipartFile file, LocalDate date) throws IOException {
+
+        List<BusinessStatusErrorModel> models = getBusinessStatusErrorModels(file);
+
+        models.stream()
+                .filter(x -> "/maintMainline/getBasicMaintainData".equals(x.getUrl()))
+                .findFirst()
+                .ifPresent(x -> x.setErrorRequests(
+                        ElasticsearchQuery.getTotal(
+                                "ext-website-cl-maint-api",
+                                "/maintMainline/getBasicMaintainData",
+                                date
+                        )
+                ));
+
+        models.sort(this::compareBusinessModels);
+        return models;
+    }
+
+    private int compareBusinessModels(BusinessStatusErrorModel m1, BusinessStatusErrorModel m2) {
+        int index1 = Arrays.asList(BUSINESS_ERROR_URLS).indexOf(m1.getUrl());
+        int index2 = Arrays.asList(BUSINESS_ERROR_URLS).indexOf(m2.getUrl());
+        return index1 != index2 ? Integer.compare(index1, index2) :
+                Float.compare(m1.getErrorRate(), m2.getErrorRate());
+    }
+
+    private void generateExcelFile(List<UrlStatusErrorModel> statusModels, List<BusinessStatusErrorModel> businessModels) throws IOException {
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            createStatusSheet(workbook, statusModels);
+            createBusinessSheet(workbook, businessModels);
+
+            String fileName = URLEncoder.encode("httpError.xlsx", StandardCharsets.UTF_8.toString());
+            saveWorkbookToFile(workbook, OUTPUT_DIRECTORY, fileName);
+        }
+    }
+
+    private void createStatusSheet(XSSFWorkbook workbook, List<UrlStatusErrorModel> models) {
+
+        XSSFSheet sheet = workbook.createSheet("状态码错误率");
+        TableUtils.createChartData(workbook, sheet, models, STATUS_COLUMN_TITLES,
+                (model, col, cell) -> {
+                    switch (col) {
+                        case 0: cell.setCellValue(model.getHost()); break;
+                        case 1: cell.setCellValue(model.getUrl()); break;
+                        case 2: cell.setCellValue(model.getStatus()); break;
+                        case 3: cell.setCellValue(model.getCount()); break;
+                        case 4: cell.setCellValue(model.getTotalCount()); break;
+                        case 5: cell.setCellValue(model.getPercentRate()); break;
+                        case 6: cell.setCellValue(model.getNot200errorRate()); break;
+                    }
+                });
+    }
+
+
+    private void createBusinessSheet(XSSFWorkbook workbook, List<BusinessStatusErrorModel> models) {
+
+        XSSFSheet sheet = workbook.createSheet("业务异常错误率");
+        TableUtils.createChartData(workbook, sheet, models, BUSINESS_COLUMN_TITLES,
+                (model, col, cell) -> {
+                    switch (col) {
+                        case 0: cell.setCellValue(model.getAppId()); break;
+                        case 1: cell.setCellValue(model.getUrl()); break;
+                        case 2: cell.setCellValue(model.getTotalRequests()); break;
+                        case 3: cell.setCellValue(model.getErrorRequests()); break;
+                        case 4: cell.setCellValue(model.getErrorRate()); break;
+                    }
+                });
+    }
+
     @PostMapping("/upload/statusError")
-    public String readFile(@ApiParam(value = "accesslog", required = true)
+    public ResponseEntity<String> readFile(@ApiParam(value = "accesslog", required = true)
                            @RequestParam("accesslogFile") MultipartFile accesslogFile,
 
                            @ApiParam(value = "code", required = true)
@@ -69,176 +235,26 @@ public class UrlErrorRateController {
 
                            @ApiParam(value = "以yyyy-MM-dd格式表示的日期", required = true)
                            @RequestParam("date") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) throws IOException {
-        String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/";
-        File directory = new File(directoryPath);
-        if (!directory.exists()) {
-            // 创建所有必要的目录
-            directory.mkdirs();
+        try {
+            ensureDirectoryExists(OUTPUT_DIRECTORY);
+
+            List<UrlStatusErrorModel> statusModels = processAccesslogFile(accesslogFile);
+            List<BusinessStatusErrorModel> businessModels = processCodeFile(codeFile, date);
+            generateExcelFile(statusModels, businessModels);
+
+            return ResponseEntity.ok("文件处理成功");
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError()
+                    .body("文件处理失败: " + e.getMessage());
         }
-
-        List<List<String>> listList = CsvUtils.getDataFromInputStream(accesslogFile.getInputStream());
-        List<UrlStatusErrorModel> urlStatusErrorModels = new ArrayList<>();
-        for (int i = 1; i < listList.size(); i++) {
-            List<String> list = listList.get(i);
-            UrlStatusErrorModel urlStatusErrorModel = new UrlStatusErrorModel();
-            urlStatusErrorModel.setHost(list.get(0));
-            urlStatusErrorModel.setUrl(list.get(1));
-            urlStatusErrorModel.setStatus(Integer.parseInt(list.get(2)));
-            urlStatusErrorModel.setCount(Integer.parseInt(list.get(3)));
-            urlStatusErrorModels.add(urlStatusErrorModel);
-        }
-
-        // urlStatusErrorModels按照url进行分组
-        Map<String, List<UrlStatusErrorModel>> urlStatusErrorModelMap = urlStatusErrorModels.stream()
-                .collect(Collectors.groupingBy(UrlStatusErrorModel::getUrl));
-
-        List<UrlStatusErrorModel> newUrlStatusErrorModels = new ArrayList<>();
-        for (Map.Entry<String, List<UrlStatusErrorModel>> entry : urlStatusErrorModelMap.entrySet()) {
-            List<UrlStatusErrorModel> value = entry.getValue();
-            // 统计每个url的总请求数
-            int totalCount = 0;
-            int not200Count = 0;
-            for (UrlStatusErrorModel urlStatusErrorModel : value) {
-                Integer count = urlStatusErrorModel.getCount();
-                totalCount = totalCount + count;
-                if (urlStatusErrorModel.getStatus() != 200) {
-                    not200Count = not200Count + count;
-                }
-            }
-            int finalTotalCount = totalCount;
-            int finalNot200Count = not200Count;
-            value.forEach(urlStatusErrorModel -> {
-                urlStatusErrorModel.setTotalCount(finalTotalCount);
-                urlStatusErrorModel.setNot200Count(finalNot200Count);
-                newUrlStatusErrorModels.add(urlStatusErrorModel);
-            });
-
-        }
-        List<String> urlList = new ArrayList<>();
-        urlList.add("/cl-tire-site/tireListModule/getTireList");
-        urlList.add("/cl-maint-api/maintMainline/getBasicMaintainData");
-        urlList.add("/cl-maint-mainline/mainline/getDynamicData");
-        urlList.add("/cl-oto-front-api/batteryList/getBatteryList");
-        urlList.add("/mlp-product-search-api/module/search/pageList");
-        urlList.add("/mlp-product-search-api/main/search/api/mainProduct");
-        urlList.add("/ext-website-cl-beauty-api/channelPage/v4/getBeautyHomeShopListAndRecommendLabel");
-        urlList.add("/cl-product-components/GoodsDetail/detailModuleInfo");
-        urlList.add("/cl-tire-site/tireModule/getTireDetailModuleData");
-        urlList.add("/cl-maint-mainline/productMainline/getMaintProductDetailInfo");
-        urlList.add("/cl-product-components/GoodsDetail/productDetailModularInfoForBff");
-        urlList.add("/cl-ordering-aggregator/ordering/getOrderConfirmFloatLayerData");
-        urlList.add("/cl-maint-order-create/order/getConfirmOrderData");
-
-        // 将newUrlStatusErrorModels按照url排序，url按照urlList的顺序排序,如果url相同，再按照status排序
-        newUrlStatusErrorModels.sort((model1, model2) -> {
-            int index1 = urlList.indexOf(model1.getUrl());
-            int index2 = urlList.indexOf(model2.getUrl());
-            if (index1 != index2) {
-                return Integer.compare(index1, index2);
-            }
-            return Integer.compare(model1.getStatus(), model2.getStatus());
-        });
-        List<BusinessStatusErrorModel> businessStatusErrorModels = getBusinessStatusErrorModels(codeFile);
-        List<String> urlList2 = new ArrayList<>();
-        urlList2.add("/tireListModule/getTireList");
-        urlList2.add("/maintMainline/getBasicMaintainData");
-        urlList2.add("/mainline/getDynamicData");
-        urlList2.add("/batteryList/getBatteryList");
-        urlList2.add("/module/search/pageList");
-        urlList2.add("/main/search/api/mainProduct");
-        urlList2.add("/channelPage/v4/getBeautyHomeShopListAndRecommendLabel");
-        urlList2.add("/GoodsDetail/detailModuleInfo");
-        urlList2.add("/getTireDetailModuleData");
-        urlList2.add("/productMainline/getMaintProductDetailInfo");
-        urlList2.add("/GoodsDetail/productDetailModularInfoForBff");
-        urlList2.add("/ordering/getOrderConfirmFloatLayerData");
-        urlList2.add("/order/getConfirmOrderData");
-        businessStatusErrorModels.sort((model1, model2) -> {
-            int index1 = urlList2.indexOf(model1.getUrl());
-            int index2 = urlList2.indexOf(model2.getUrl());
-            if (index1 != index2) {
-                return Integer.compare(index1, index2);
-            }
-            return Float.compare(model1.getErrorRate(), model2.getErrorRate());
-        });
-
-        // 替换ext-website-cl-maint-api：/maintMainline/getBasicMaintainData的错误率
-        businessStatusErrorModels.stream()
-                .filter(x -> "/maintMainline/getBasicMaintainData".equals(x.getUrl()))
-                .findFirst()
-                .ifPresent(x ->
-                {
-                    int total = ElasticsearchQuery.getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData", date);
-                    x.setErrorRequests(total);
-                });
-        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-
-            // 定义 Sheet 名称和数据列表
-            XSSFSheet sheet1 = workbook.createSheet("状态码错误率");
-            XSSFSheet sheet2 = workbook.createSheet("业务异常错误率");
-            String[] columnTitles = {"host", "url", "status", "请求次数", "请求总数", "占比", "非200占比"};
-            String[] columnTitles2 = {"服务名称", "接口路径", "总请求量", "非10000请求量", "占比"};
-
-            TableUtils.createChartData(workbook, sheet2, businessStatusErrorModels, columnTitles2, (model, columnIndex, cell) -> {
-                switch (columnIndex) {
-                    case 0:
-                        cell.setCellValue(model.getAppId());
-                        break;
-                    case 1:
-                        cell.setCellValue(model.getUrl());
-                        break;
-                    case 2:
-                        cell.setCellValue(model.getTotalRequests());
-                        break;
-                    case 3:
-                        cell.setCellValue(model.getErrorRequests());
-                        break;
-                    case 4:
-                        cell.setCellValue(model.getErrorRate());
-                        break;
-                }
-            });
-
-            TableUtils.createChartData(workbook, sheet1, newUrlStatusErrorModels, columnTitles, (model, columnIndex, cell) -> {
-                switch (columnIndex) {
-                    case 0:
-                        cell.setCellValue(model.getHost());
-                        break;
-                    case 1:
-                        cell.setCellValue(model.getUrl());
-                        break;
-                    case 2:
-                        cell.setCellValue(model.getStatus());
-                        break;
-                    case 3:
-                        cell.setCellValue(model.getCount());
-                        break;
-                    case 4:
-                        cell.setCellValue(model.getTotalCount());
-                        break;
-                    case 5:
-                        cell.setCellValue(model.getPercentRate());
-                        break;
-                    case 6:
-                        cell.setCellValue(model.getNot200errorRate());
-                        break;
-                }
-            });
-
-
-            String fileName = URLEncoder.encode("httpError.xlsx", StandardCharsets.UTF_8.toString());
-            saveWorkbookToFile(workbook, directoryPath, fileName);
-        }
-        return "ok";
     }
 
 
-    private void saveWorkbookToFile(XSSFWorkbook workbook, String directoryPath, String fileName) {
-        String filePath = directoryPath + "/" + fileName;
-        try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
-            workbook.write(fileOut);
-        } catch (IOException e) {
-            log.error("文件保存失败 | 路径: {} | 错误: {}", filePath, e.getMessage(), e);
+    private void saveWorkbookToFile(XSSFWorkbook workbook, String directoryPath, String fileName) throws IOException {
+
+        File file = new File(directoryPath, fileName);
+        try (FileOutputStream out = new FileOutputStream(file)) {
+            workbook.write(out);
         }
     }
 }
