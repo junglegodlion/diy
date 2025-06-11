@@ -9,6 +9,7 @@ import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +65,10 @@ public class UrlErrorRateController {
                            @RequestParam("accesslogFile") MultipartFile accesslogFile,
 
                            @ApiParam(value = "code", required = true)
-                           @RequestParam("codeFile") MultipartFile codeFile) throws IOException {
+                           @RequestParam("codeFile") MultipartFile codeFile,
+
+                           @ApiParam(value = "以yyyy-MM-dd格式表示的日期", required = true)
+                           @RequestParam("date") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) throws IOException {
         String directoryPath = System.getProperty("user.home") + "/Desktop/备份/c端网关接口性能统计/数据统计/输出/";
         File directory = new File(directoryPath);
         if (!directory.exists()) {
@@ -158,12 +163,12 @@ public class UrlErrorRateController {
         });
 
         // 替换ext-website-cl-maint-api：/maintMainline/getBasicMaintainData的错误率
-
         businessStatusErrorModels.stream()
-                .filter(x -> x.getUrl().equals("/maintMainline/getBasicMaintainData"))
-                .filter(Objects::nonNull).findFirst().ifPresent(x ->
+                .filter(x -> "/maintMainline/getBasicMaintainData".equals(x.getUrl()))
+                .findFirst()
+                .ifPresent(x ->
                 {
-                    int total = ElasticsearchQuery.getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData");
+                    int total = ElasticsearchQuery.getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData", date);
                     x.setErrorRequests(total);
                 });
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {

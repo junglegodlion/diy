@@ -28,12 +28,12 @@ public class ElasticsearchQuery {
     }};
 
     public static void main(String[] args) {
-        int total = getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData");
+        int total = getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData", LocalDate.now());
         System.out.println(total);
         // 输出结果
     }
 
-    public static int getTotal(String appId, String url) {
+    public static int getTotal(String appId, String url, LocalDate localDate) {
         String baseUrl = "https://int-service-elk.tuhuyun.cn/elasticsearch/logstash-int-service-server-side-log-*/_search";
 
         // 查询参数
@@ -44,13 +44,10 @@ public class ElasticsearchQuery {
         queryParams.put("preference", System.currentTimeMillis());
         queryParams.put("timeout", "30000ms");
 
-        // 获取当前日期并减去一天
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-
         // 设置开始时间(00:00:00)
-        LocalDateTime start = yesterday.atStartOfDay();
+        LocalDateTime start = localDate.atStartOfDay();
         // 设置结束时间(23:59:59.999)
-        LocalDateTime end = yesterday.atTime(23, 59, 59, 999000000);
+        LocalDateTime end = localDate.atTime(23, 59, 59, 999000000);
 
         // 转换为UTC时区并格式化为字符串
         String startTime = ZonedDateTime.of(start, ZoneId.systemDefault())
