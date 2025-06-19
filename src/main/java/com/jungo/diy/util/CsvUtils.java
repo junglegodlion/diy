@@ -14,9 +14,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * @author lichuang3
@@ -27,36 +30,45 @@ public class CsvUtils {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final LocalDate DATE_THRESHOLD = LocalDate.of(2025, 1, 17);
     private static final String HOST_NAME = "cl-gateway.tuhu.cn";
-    public static List<List<String>> getData(String directoryName, Path path) {
+
+    /**
+     * 从指定路径读取CSV数据
+     * @param directoryName 目标目录名 (可优化为更具体的参数名)
+     * @param path 文件路径
+     * @return 非null的CSV数据列表，出错时返回空列表
+     */
+    public static List<List<String>> readCsvData(String directoryName, Path path) {
         try (InputStream is = Files.newInputStream(path)) {
             return getDataFromInputStream(directoryName, is);
         } catch (IOException e) {
-            log.error("CsvUtils#getData,出现异常！", e);
+            log.error("Failed to read CSV from {}: {}", directoryName, path, e);
         }
         return Collections.emptyList();
     }
 
 
+    /**
+     * 从输入流解析CSV数据并进行必要转换
+     * @param directoryName 用于数据转换的目录标识
+     * @param inputStream 输入流(自动关闭)
+     * @return 处理后的CSV数据列表，不会返回null
+     */
     public static List<List<String>> getDataFromInputStream(String directoryName, InputStream inputStream) {
-        List<List<String>> data = new ArrayList<>();
         List<List<String>> newData = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
             CSVParser parser = CSVFormat.DEFAULT.parse(reader);
             for (CSVRecord record : parser) {
-                List<String> row = new ArrayList<>();
-                record.forEach(row::add);
-                data.add(row);
+                // 将CSV记录转换为字符串列表
+                List<String> row = StreamSupport.stream(record.spliterator(), false)
+                        .collect(Collectors.toList());
+                // 检查当前行是否满足条件（包含斜杠）
+                if (checkListForSlash(row)) {
+                    // 如果满足条件，则处理该行并添加到结果中
+                    newData.add(getNewCollect(row, directoryName));
+                }
             }
         } catch (IOException e) {
             log.error("CsvUtils#getData,出现异常！", e);
-        }
-
-        for (List<String> datum : data) {
-            if (checkListForSlash(datum)) {
-                // 对collect进行处理
-                List<String> newCollect = getNewCollect(datum, directoryName);
-                newData.add(newCollect);
-            }
         }
         return newData;
     }
@@ -78,21 +90,31 @@ public class CsvUtils {
 
 
     /**
-     * 根据目录名日期判断是否需要修改原始集合，若目录日期早于阈值则在头部添加主机名
-     *
-     * @param collect        原始字符串集合，可能被修改的基础集合
-     * @param directoryName  目录名称（需符合DATE_FORMATTER格式的日期字符串）
-     * @return 若满足日期条件则返回添加了HOST_NAME的新集合，否则返回原始集合
-     *         返回的集合顺序：当添加时HOST_NAME位于集合第一个元素位置
+     * 根据目录名称日期判断是否在阈值日期之前，决定是否在集合头部添加主机名
+     * @param collect 原始字符串集合，不能为null
+     * @param directoryName 目录名称字符串，应包含符合DATE_FORMATTER格式的日期，不能为null
+     * @return 处理后的新集合：
+     *         - 如果directoryName日期解析失败，返回原始集合
+     *         - 如果目录日期早于阈值日期DATE_THRESHOLD，返回添加了HOST_NAME的新集合
+     *         - 否则返回原始集合
+     * @throws NullPointerException 如果collect或directoryName为null
      */
     private static List<String> getNewCollect(List<String> collect, String directoryName) {
-        LocalDate localDate = LocalDate.parse(directoryName, DATE_FORMATTER);
+        Objects.requireNonNull(collect, "collect must not be null");
+        Objects.requireNonNull(directoryName, "directoryName must not be null");
+        LocalDate localDate;
+        try {
+            localDate = LocalDate.parse(directoryName, DATE_FORMATTER);
+        } catch (DateTimeParseException e) {
+            log.warn("Invalid date format for directoryName: {}", directoryName, e);
+            return collect;
+        }
 
+        // 判断解析出的日期是否早于阈值日期
         if (localDate.isBefore(DATE_THRESHOLD)) {
-            List<String> newCollect = new ArrayList<>(collect.size() + 1);
-            newCollect.add(HOST_NAME);
-            newCollect.addAll(collect);
-            return newCollect;
+            // 在集合开头添加HOST_NAME并返回新集合
+            return Stream.concat(Stream.of(HOST_NAME), collect.stream())
+                    .collect(Collectors.toList());
         }
         return collect;
     }

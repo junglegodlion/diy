@@ -134,19 +134,51 @@ public class FileReaderService {
         return path;
     }
 
+    /**
+     * 从指定目录读取CSV数据并返回二维列表
+     *
+     * @param directoryName 目录名称
+     * @param path 文件路径
+     * @return 包含CSV数据的二维列表，每个子列表代表一行数据
+     * @throws IOException 当发生I/O错误时抛出
+     */
     private static List<List<String>> getLists(String directoryName, Path path) throws IOException {
-
-        return CsvUtils.getData(directoryName, path);
+        // 调用CsvUtils工具类读取CSV文件数据
+        return CsvUtils.readCsvData(directoryName, path);
     }
 
+    /**
+     * 将性能文件夹数据写入数据库
+     *
+     * @param performanceFolderModel 包含要写入数据库的文件夹数据对象，不可为null
+     *
+     * 方法逻辑：
+     * 1. 首先检查输入参数是否为null，若是则记录错误日志并返回
+     * 2. 获取文件夹名称并校验是否为空或空字符串
+     * 3. 调用write2DBNew方法将数据写入数据库
+     * 4. 捕获并处理可能出现的异常
+     *
+     * 注意：
+     * - 使用StringUtils.isEmpty()方法判断字符串是否为空
+     * - 所有错误情况都会记录详细的错误日志
+     * - 方法会在遇到错误时提前返回，避免继续执行
+     */
     public void writeDataToDatabase(PerformanceFolderModel performanceFolderModel) {
+        if (performanceFolderModel == null) {
+            log.error("FileReaderService#writeDataToDatabase,Attempted to write null performance folder model！");
+            return;
+        }
         try {
             // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
             String folderName = performanceFolderModel.getFolderName();
+            if (StringUtils.isEmpty(folderName)) {
+                log.error("FileReaderService#writeDataToDatabase,Empty folder name in performance folder model！");
+                return;
+            }
             // folderName转化成LocalDate
             write2DBNew(performanceFolderModel, folderName);
         } catch (Exception e) {
-            log.error("FileReaderService#writeDataToDatabase,出现异常！", e);
+            log.error("FileReaderService#writeDataToDatabase,Failed to write performance data to DB for folder: {}", performanceFolderModel.getFolderName(), e);
         }
 
     }
