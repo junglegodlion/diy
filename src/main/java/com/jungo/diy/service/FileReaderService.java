@@ -38,6 +38,7 @@ public class FileReaderService {
     // 仅允许英文字母和 -：通过字符集 [A-Za-z-] 控制（需注意 - 在正则中需放在末尾避免歧义）
     private static final Pattern PATTERN = Pattern.compile("^(?=.*-)[A-Za-z-]+$");
 
+    private static final String CSV_EXTENSION = ".csv";
 
     @Autowired
     PerformanceRepository performanceRepository;
@@ -58,59 +59,79 @@ public class FileReaderService {
      * @throws RuntimeException 当目录访问失败时抛出
      */
     public String readTargetFiles(String directoryName) {
-        // 校验路径是否为空或包含非法字符
-        if (directoryName == null || directoryName.trim().isEmpty()) {
-            throw new IllegalArgumentException("目标目录不能为空");
-        }
-
-        // 尝试解析路径
-        Path dirPath;
-        try {
-            dirPath = Paths.get(PREFIX + directoryName);
-        } catch (InvalidPathException e) {
-            throw new IllegalArgumentException("路径包含非法字符: " + e.getMessage());
-        }
-
-        // 路径校验
-        if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
-            throw new IllegalArgumentException("目录不存在或不是文件夹");
-        }
-        PerformanceFolderModel performanceFolderModel = new PerformanceFolderModel();
-        performanceFolderModel.setFolderName(directoryName);
-        List<PerformanceFileModel> files = new ArrayList<>();
-        performanceFolderModel.setFiles(files);
-
+        // 验证目录路径并转换为Path对象
+        Path dirPath = validateAndGetPath(directoryName);
+        // 创建文件夹模型对象
+        PerformanceFolderModel folderModel = createFolderModel(directoryName);
         try (Stream<Path> paths = Files.list(dirPath)) {
-            paths.filter(Files::isRegularFile)
-                    .limit(5)
-                    .forEach(path -> {
-                        try {
-                            String fileName = path.getFileName().toString();
-                            // 检查文件名是否包含.csv后缀
-                            if (!fileName.endsWith(".csv")) {
-                                log.warn("FileReaderService#readTargetFiles,文件{}不是.csv文件，跳过！", fileName);
-                                return;
-                            }
-                            // fileName去除.csv后缀
-                            fileName = fileName.substring(0, fileName.length() - 4);
-                            PerformanceFileModel performanceFileModel = new PerformanceFileModel();
-                            performanceFileModel.setFileName(fileName);
-                            List<List<String>> data = getLists(directoryName, path);
-                            performanceFileModel.setData(data);
-                            files.add(performanceFileModel);
-                        } catch (IOException e) {
-                            log.error("FileReaderService#readTargetFiles,出现异常！", e);
-                        }
-                    });
-
+            // 处理目录中的文件:
+            // 1. 过滤出常规文件：排除目录；排除符号链接；排除设备文件等其他特殊文件类型
+            // 2. 限制前5个文件
+            // 3. 处理每个文件
+            // 4. 过滤掉null结果
+            // 5. 收集到列表中
+            folderModel.setFiles(
+                    paths.filter(Files::isRegularFile)
+                            .limit(5)
+                            .map(this::processFile)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList())
+            );
         } catch (IOException e) {
             throw new RuntimeException("目录访问失败", e);
         }
 
         // 将性能数据写入数据库
-        writeDataToDatabase(performanceFolderModel);
-        log.info("FileReaderService#readTargetFiles,成功将性能数据写入数据库！文件名为：{}", directoryName);
+        writeDataToDatabase(folderModel);
+        log.info("FileReaderService#readTargetFiles,成功处理目录:{}", directoryName);
         return "success";
+    }
+
+    private PerformanceFileModel processFile(Path path) {
+        try {
+            String fileName = path.getFileName().toString();
+            if (!fileName.endsWith(CSV_EXTENSION)) {
+                log.warn("跳过非CSV文件: {}", fileName);
+                return null;
+            }
+
+            PerformanceFileModel fileModel = new PerformanceFileModel();
+            fileModel.setFileName(removeExtension(fileName));
+            fileModel.setData(getLists(path.getParent().toString(), path));
+            return fileModel;
+        } catch (IOException e) {
+            log.error("文件处理失败: {}", path, e);
+            return null;
+        }
+    }
+
+    private String removeExtension(String fileName) {
+        return fileName.substring(0, fileName.length() - CSV_EXTENSION.length());
+    }
+
+    private PerformanceFolderModel createFolderModel(String directoryName) {
+        PerformanceFolderModel model = new PerformanceFolderModel();
+        model.setFolderName(directoryName);
+        model.setFiles(new ArrayList<>());
+        return model;
+    }
+
+    private Path validateAndGetPath(String directoryName) {
+        if (directoryName == null || directoryName.trim().isEmpty()) {
+            throw new IllegalArgumentException("目标目录不能为空");
+        }
+
+        Path path;
+        try {
+            path = Paths.get(PREFIX + directoryName);
+        } catch (InvalidPathException e) {
+            throw new IllegalArgumentException("路径包含非法字符", e);
+        }
+
+        if (!Files.exists(path) || !Files.isDirectory(path)) {
+            throw new IllegalArgumentException("目录不存在或不是文件夹");
+        }
+        return path;
     }
 
     private static List<List<String>> getLists(String directoryName, Path path) throws IOException {
@@ -262,6 +283,13 @@ public class FileReaderService {
         return null;
     }
 
+    /**
+     * 获取指定日期范围内的多个文件
+     *
+     * @param startDirectoryName 起始日期字符串（格式：yyyy-MM-dd）
+     * @param endDirectoryName 结束日期字符串（格式：yyyy-MM-dd）
+     * @return 操作结果，"success"表示执行成功
+     */
     public Object getMultiFile(String startDirectoryName, String endDirectoryName) {
         LocalDate startDate = DateUtils.getLocalDate(startDirectoryName, DateUtils.YYYY_MM_DD);
         LocalDate endDate = DateUtils.getLocalDate(endDirectoryName, DateUtils.YYYY_MM_DD);
