@@ -40,6 +40,11 @@ public class FileReaderService {
 
     private static final String CSV_EXTENSION = ".csv";
 
+    private static final String SLOW_QUERY = "慢查询";
+    private static final String REQUEST_INFO = "请求情况";
+    private static final String DOMAIN_SLOW_QUERY = "域名慢查询";
+    private static final String DOMAIN_REQUEST_INFO = "域名请求情况";
+
     @Autowired
     PerformanceRepository performanceRepository;
 
@@ -204,23 +209,26 @@ public class FileReaderService {
     }
 
     private void write2DBNew(PerformanceFolderModel performanceFolderModel, String folderName) {
+        if (performanceFolderModel == null || performanceFolderModel.getFiles() == null) {
+            throw new IllegalArgumentException("Performance files data is null");
+        }
         // folderName转化成Date
         // 创建SimpleDateFormat实例，并指定日期格式
         Date date = getDateFromString(folderName);
         Map<String, List<List<String>>> map = performanceFolderModel.getFiles().stream().collect(Collectors.toMap(PerformanceFileModel::getFileName, PerformanceFileModel::getData));
         // 慢查询文件
-        List<List<String>> slowRequestSheetModel = map.get("慢查询");
+        List<List<String>> slowRequestSheetModel = map.get(SLOW_QUERY);
         Map<String, Integer> slowRequestSheetModelMap = slowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0) + x.get(1), x -> Integer.parseInt(x.get(2)), (x, y) -> x));
         // 请求情况文件
-        List<List<String>> requestSheetModel = deduplicate(map.get("请求情况"));
+        List<List<String>> requestSheetModel = deduplicate(map.get(REQUEST_INFO));
         // 域名慢查询文件
-        List<List<String>> domainSlowRequestSheetModel = map.get("域名慢查询");
+        List<List<String>> domainSlowRequestSheetModel = map.get(DOMAIN_SLOW_QUERY);
         if (domainSlowRequestSheetModel == null) {
             domainSlowRequestSheetModel = new ArrayList<>();
         }
         Map<String, Integer> domainSlowRequestSheetModelMap = domainSlowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));
         // 域名请求情况文件
-        List<List<String>> domainRequestSheetModel = map.get("域名请求情况");
+        List<List<String>> domainRequestSheetModel = map.get(DOMAIN_REQUEST_INFO);
         if (domainRequestSheetModel == null) {
             domainRequestSheetModel = new ArrayList<>();
         }
