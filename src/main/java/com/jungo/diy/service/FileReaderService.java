@@ -133,7 +133,7 @@ public class FileReaderService {
 
             PerformanceFileModel fileModel = new PerformanceFileModel();
             fileModel.setFileName(removeExtension(fileName));
-            fileModel.setData(getLists(path.getParent().toString(), path));
+            fileModel.setData(getLists(path.getParent().getFileName().toString(), path));
             return fileModel;
         } catch (IOException e) {
             log.error("文件处理失败: {}", path, e);
