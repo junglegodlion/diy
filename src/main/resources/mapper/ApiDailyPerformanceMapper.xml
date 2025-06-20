@@ -11,6 +11,7 @@
         <result column="p90" property="p90" jdbcType="INTEGER"/>
         <result column="p75" property="p75" jdbcType="INTEGER"/>
         <result column="p50" property="p50" jdbcType="INTEGER"/>
+        <result column="p95" property="p95" jdbcType="INTEGER"/>
         <result column="totalRequestCount" property="totalRequestCount" jdbcType="INTEGER"/>
         <result column="slowRequestCount" property="slowRequestCount" jdbcType="INTEGER"/>
         <result column="date" property="date" jdbcType="DATE"/>
@@ -25,10 +26,12 @@
     </insert>
 
     <insert id="batchInsert">
-        INSERT INTO api_daily_performance(host, url, p99, p999, p90, p75, p50, totalRequestCount, slowRequestCount, date)
+        INSERT INTO api_daily_performance(host, url, p99, p999, p90, p75, p50, p95,totalRequestCount, slowRequestCount,
+        date)
         VALUES
         <foreach collection="list" item="item" index="index" separator=",">
-            (#{item.host}, #{item.url}, #{item.p99}, #{item.p999}, #{item.p90}, #{item.p75}, #{item.p50}, #{item.totalRequestCount}, #{item.slowRequestCount}, #{item.date})
+            (#{item.host}, #{item.url}, #{item.p99}, #{item.p999}, #{item.p90}, #{item.p75}, #{item.p50},#{item.p95},
+            #{item.totalRequestCount}, #{item.slowRequestCount}, #{item.date})
         </foreach>
     </insert>
 

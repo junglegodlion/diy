@@ -1,6 +1,7 @@
 package com.jungo.diy.entity;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -13,6 +14,7 @@ import java.util.Date;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class ApiDailyPerformanceEntity {
     // id
     private Integer id;
@@ -31,6 +33,8 @@ public class ApiDailyPerformanceEntity {
     private Integer p75;
     // 50线
     private Integer p50;
+    // 95线
+    private Integer p95;
     // 总调用数量
     private Integer totalRequestCount;
     // 慢请求数

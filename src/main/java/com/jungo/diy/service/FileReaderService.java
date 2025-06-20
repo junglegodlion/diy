@@ -256,6 +256,8 @@ public class FileReaderService {
         Map<String, Integer> slowRequestSheetModelMap = getSlowRequestSheetModelMap(fileDataMap);
         // 请求情况文件
         List<List<String>> requestSheetModel = deduplicate(fileDataMap.getOrDefault(REQUEST_INFO, Collections.emptyList()));
+
+
         // 网关性能数据
         List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntityList(fileDataMap, date);
         // 接口性能数据
@@ -342,26 +344,51 @@ public class FileReaderService {
         return gateWayDailyPerformanceEntities;
     }
 
-    private List<ApiDailyPerformanceEntity> getApiDailyPerformanceEntities(List<List<String>> requestSheetModel, Date date, Map<String, Integer> slowRequestSheetModelMap) {
+    private List<ApiDailyPerformanceEntity> getApiDailyPerformanceEntities(List<List<String>> requestSheetModel,
+                                                                           Date date,
+                                                                           Map<String, Integer> slowRequestSheetModelMap) {
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = new ArrayList<>();
         for (List<String> list : requestSheetModel) {
             String url = list.get(1);
             if (checkUrl(url)) {
-                ApiDailyPerformanceEntity apiDailyPerformanceEntity = new ApiDailyPerformanceEntity();
-                apiDailyPerformanceEntity.setDate(date);
-                apiDailyPerformanceEntity.setHost(list.get(0));
-                apiDailyPerformanceEntity.setUrl(url);
-                apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(2)));
-                apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(3)));
-                apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(4)));
-                apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(5)));
-                apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(6)));
-                apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(7)));
-                apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0) + list.get(1), 0));
+                ApiDailyPerformanceEntity apiDailyPerformanceEntity = getApiDailyPerformanceEntity(date, slowRequestSheetModelMap, list, url);
                 apiDailyPerformanceEntities.add(apiDailyPerformanceEntity);
             }
         }
         return apiDailyPerformanceEntities;
+    }
+
+    private static ApiDailyPerformanceEntity getApiDailyPerformanceEntity(Date date,
+                                                                          Map<String, Integer> slowRequestSheetModelMap,
+                                                                          List<String> list,
+                                                                          String url) {
+        ApiDailyPerformanceEntity apiDailyPerformanceEntity = new ApiDailyPerformanceEntity();
+        if (list.size() > 8) {
+            apiDailyPerformanceEntity.setDate(date);
+            apiDailyPerformanceEntity.setHost(list.get(0));
+            apiDailyPerformanceEntity.setUrl(url);
+            apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(2)));
+            apiDailyPerformanceEntity.setP95(Integer.parseInt(list.get(3)));
+            apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(4)));
+            apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(5)));
+            apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(6)));
+            apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(7)));
+            apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(8)));
+            apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0) + list.get(1), 0));
+        } else {
+            apiDailyPerformanceEntity.setDate(date);
+            apiDailyPerformanceEntity.setHost(list.get(0));
+            apiDailyPerformanceEntity.setUrl(url);
+            apiDailyPerformanceEntity.setTotalRequestCount(Integer.parseInt(list.get(2)));
+            apiDailyPerformanceEntity.setP999(Integer.parseInt(list.get(3)));
+            apiDailyPerformanceEntity.setP99(Integer.parseInt(list.get(4)));
+            apiDailyPerformanceEntity.setP90(Integer.parseInt(list.get(5)));
+            apiDailyPerformanceEntity.setP75(Integer.parseInt(list.get(6)));
+            apiDailyPerformanceEntity.setP50(Integer.parseInt(list.get(7)));
+            apiDailyPerformanceEntity.setSlowRequestCount(slowRequestSheetModelMap.getOrDefault(list.get(0) + list.get(1), 0));
+        }
+
+        return apiDailyPerformanceEntity;
     }
 
     // 匹配以字母开头，包含字母、数字和下划线，并以字母或数字结尾的正则表达式
