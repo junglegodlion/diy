@@ -190,6 +190,7 @@ public class FileReaderService {
 
 
     /**
+     * 背景：表格文件中有同一个url的性能数据有多条，需要去除重复数据（请求量小的数据为脏数据）
      * 对请求表数据进行去重处理，保留每个token中总请求数最大的记录
      *
      * @param requestSheetModel 原始请求表数据，每个元素为一个记录行，包含token和请求数等信息
@@ -198,10 +199,13 @@ public class FileReaderService {
     private List<List<String>> deduplicate(List<List<String>> requestSheetModel) {
         Map<String, List<String>> tokenMap = new HashMap<>();
         for (List<String> record : requestSheetModel) {
+            // 构建 token：由第0列和第1列拼接，并去除第1列前后空格后组成唯一标识符
             String token = (record.get(0) + record.get(1).trim()).toLowerCase();
             tokenMap.merge(token, record, (existingRecord, newRecord) -> {
+                // 如果出现重复 token，比较两个记录的总请求数（第2列）
                 int existingCount = Integer.parseInt(existingRecord.get(2));
                 int newCount = Integer.parseInt(newRecord.get(2));
+                // 保留请求数较大的那条记录
                 return newCount > existingCount ? newRecord : existingRecord;
             });
         }
@@ -215,27 +219,72 @@ public class FileReaderService {
         // folderName转化成Date
         // 创建SimpleDateFormat实例，并指定日期格式
         Date date = getDateFromString(folderName);
-        Map<String, List<List<String>>> map = performanceFolderModel.getFiles().stream().collect(Collectors.toMap(PerformanceFileModel::getFileName, PerformanceFileModel::getData));
+
+        Map<String, List<List<String>>> fileDataMap = getFileDataMap(performanceFolderModel);
         // 慢查询文件
-        List<List<String>> slowRequestSheetModel = map.get(SLOW_QUERY);
-        Map<String, Integer> slowRequestSheetModelMap = slowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0) + x.get(1), x -> Integer.parseInt(x.get(2)), (x, y) -> x));
+        Map<String, Integer> slowRequestSheetModelMap = getSlowRequestSheetModelMap(fileDataMap);
         // 请求情况文件
-        List<List<String>> requestSheetModel = deduplicate(map.get(REQUEST_INFO));
-        // 域名慢查询文件
-        List<List<String>> domainSlowRequestSheetModel = map.get(DOMAIN_SLOW_QUERY);
-        if (domainSlowRequestSheetModel == null) {
-            domainSlowRequestSheetModel = new ArrayList<>();
-        }
-        Map<String, Integer> domainSlowRequestSheetModelMap = domainSlowRequestSheetModel.stream().collect(Collectors.toMap(x -> x.get(0), x -> Integer.parseInt(x.get(1)), (x, y) -> x));
-        // 域名请求情况文件
-        List<List<String>> domainRequestSheetModel = map.get(DOMAIN_REQUEST_INFO);
-        if (domainRequestSheetModel == null) {
-            domainRequestSheetModel = new ArrayList<>();
-        }
-        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntities(domainRequestSheetModel, date, domainSlowRequestSheetModelMap);
+        List<List<String>> requestSheetModel = deduplicate(fileDataMap.getOrDefault(REQUEST_INFO, Collections.emptyList()));
+        // 网关性能数据
+        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntityList(fileDataMap, date);
+        // 接口性能数据
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntities(requestSheetModel, date, slowRequestSheetModelMap);
 
         performanceRepository.writePerformanceData2DB(gateWayDailyPerformanceEntities, apiDailyPerformanceEntities);
+    }
+
+    private List<GateWayDailyPerformanceEntity> getGateWayDailyPerformanceEntityList(Map<String, List<List<String>>> fileDataMap, Date date) {
+        // 域名慢查询文件
+        Map<String, Integer> domainSlowRequestSheetModelMap = getDomainSlowRequestSheetModelMap(fileDataMap);
+        // 域名请求情况文件
+        List<List<String>> domainRequestSheetModel = fileDataMap.getOrDefault(DOMAIN_REQUEST_INFO, Collections.emptyList());
+        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntities(domainRequestSheetModel, date, domainSlowRequestSheetModelMap);
+        return gateWayDailyPerformanceEntities;
+    }
+
+    private static Map<String, Integer> getDomainSlowRequestSheetModelMap(Map<String, List<List<String>>> fileDataMap) {
+        List<List<String>> domainSlowQueryData = fileDataMap.getOrDefault(DOMAIN_SLOW_QUERY, Collections.emptyList());
+
+        return domainSlowQueryData.stream()
+                .filter(row -> row.size() > 1 && isInteger(row.get(1))) // 防止越界和格式错误
+                .collect(Collectors.toMap(
+                        row -> row.get(0),
+                        row -> Integer.parseInt(row.get(1)),
+                        (existing, replacement) -> existing // 保留第一个值
+                ));
+    }
+
+    private static boolean isInteger(String str) {
+        try {
+            Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static Map<String, Integer> getSlowRequestSheetModelMap(Map<String, List<List<String>>> fileDataMap) {
+        List<List<String>> slowQueryData = fileDataMap.getOrDefault(SLOW_QUERY, Collections.emptyList());
+
+        return slowQueryData.stream()
+                .filter(row -> row.size() > 2)
+                .collect(Collectors.toMap(
+                        row -> row.get(0) + row.get(1),
+                        row -> Integer.parseInt(row.get(2)),
+                        (existing, replacement) -> existing // 保留第一个，忽略重复key
+                ));
+    }
+
+    /**
+     * 获取性能测试文件数据映射
+     * 该方法将性能测试文件夹模型中的所有文件转换为一个映射，其中键是文件名，值是文件数据
+     * 主要用途是快速检索特定文件的数据，以便进行进一步处理或展示
+     *
+     * @param performanceFolderModel 性能测试文件夹模型，包含多个性能测试文件
+     * @return 返回一个映射，其中每个文件名对应其数据列表
+     */
+    private static Map<String, List<List<String>>> getFileDataMap(PerformanceFolderModel performanceFolderModel) {
+        return performanceFolderModel.getFiles().stream().collect(Collectors.toMap(PerformanceFileModel::getFileName, PerformanceFileModel::getData));
     }
 
     private List<GateWayDailyPerformanceEntity> getGateWayDailyPerformanceEntities(List<List<String>> domainRequestSheetModel,
