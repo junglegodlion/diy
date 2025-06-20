@@ -67,6 +67,41 @@ public class FileReaderService {
         // 验证目录路径并转换为Path对象
         Path dirPath = validateAndGetPath(directoryName);
         // 创建文件夹模型对象
+        PerformanceFolderModel folderModel = getPerformanceFolderModel(directoryName, dirPath);
+
+        // 将性能数据写入数据库
+        writeDataToDatabase(folderModel);
+        log.info("FileReaderService#readTargetFiles,成功处理目录:{}", directoryName);
+        return "success";
+    }
+
+    /**
+     * 根据目录名称和路径创建并填充PerformanceFolderModel对象
+     *
+     * @param directoryName 要处理的目录名称
+     * @param dirPath 要处理的目录路径对象
+     * @return 填充完成的PerformanceFolderModel对象
+     * @throws RuntimeException 当目录访问失败时抛出
+     *
+     * 方法处理流程:
+     * 1. 根据目录名称创建PerformanceFolderModel基础对象
+     * 2. 使用try-with-resources打开目录流，确保资源自动关闭
+     * 3. 处理目录中的文件:
+     *    - 过滤出常规文件(排除目录/符号链接/设备文件等)
+     *    - 限制只处理前5个文件(性能优化)
+     *    - 对每个文件调用processFile方法进行处理
+     *    - 过滤掉处理结果为null的文件
+     *    - 将结果收集到列表中
+     * 4. 将处理后的文件列表设置到folderModel中
+     * 5. 如果出现IO异常，包装为RuntimeException抛出
+     *
+     * 注意事项:
+     * - 使用Files.list()自动关闭目录流
+     * - 严格限制只处理常规文件
+     * - 通过limit(5)限制最大处理文件数，避免内存问题
+     * - 过滤null结果保证数据质量
+     */
+    private PerformanceFolderModel getPerformanceFolderModel(String directoryName, Path dirPath) {
         PerformanceFolderModel folderModel = createFolderModel(directoryName);
         try (Stream<Path> paths = Files.list(dirPath)) {
             // 处理目录中的文件:
@@ -85,11 +120,7 @@ public class FileReaderService {
         } catch (IOException e) {
             throw new RuntimeException("目录访问失败", e);
         }
-
-        // 将性能数据写入数据库
-        writeDataToDatabase(folderModel);
-        log.info("FileReaderService#readTargetFiles,成功处理目录:{}", directoryName);
-        return "success";
+        return folderModel;
     }
 
     private PerformanceFileModel processFile(Path path) {
