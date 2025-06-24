@@ -431,15 +431,20 @@ public class FileReaderService {
     }
 
     /**
-     * 获取指定日期范围内的多个文件
-     *
-     * @param startDirectoryName 起始日期字符串（格式：yyyy-MM-dd）
-     * @param endDirectoryName 结束日期字符串（格式：yyyy-MM-dd）
-     * @return 操作结果，"success"表示执行成功
+     * 读取指定日期范围内的所有文件
+     * @param startDateStr 起始日期字符串（格式：yyyy-MM-dd）
+     * @param endDateStr 结束日期字符串（格式：yyyy-MM-dd）
+     * @return 成功success
+     * @throws IllegalArgumentException 如果日期参数无效或范围不正确
      */
-    public Object getMultiFile(String startDirectoryName, String endDirectoryName) {
-        LocalDate startDate = DateUtils.getLocalDate(startDirectoryName, DateUtils.YYYY_MM_DD);
-        LocalDate endDate = DateUtils.getLocalDate(endDirectoryName, DateUtils.YYYY_MM_DD);
+    public Object getMultiFile(String startDateStr, String endDateStr) {
+        LocalDate startDate = DateUtils.getLocalDate(startDateStr, DateUtils.YYYY_MM_DD);
+        LocalDate endDate = DateUtils.getLocalDate(endDateStr, DateUtils.YYYY_MM_DD);
+
+        if (startDate.isAfter(endDate)) {
+            throw new IllegalArgumentException("起始日期不能晚于结束日期");
+        }
+
         // 遍历日期范围
         for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
             String formattedDate = DateUtils.getDateString(date, DateUtils.YYYY_MM_DD);
