@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -116,7 +115,7 @@ public class UrlErrorRateController {
         }
     }
 
-    private List<UrlStatusErrorModel> processAccesslogFile(MultipartFile file) throws IOException {
+    private List<UrlStatusErrorModel> processAccessLogFile(MultipartFile file) throws IOException {
         List<List<String>> csvData = CsvUtils.getDataFromInputStream(file.getInputStream());
 
         return csvData.stream()
@@ -231,19 +230,19 @@ public class UrlErrorRateController {
                 });
     }
 
-    @PostMapping("/upload/statusError")
-    public ResponseEntity<String> readFile(@ApiParam(value = "accesslog", required = true)
-                           @RequestParam("accesslogFile") MultipartFile accesslogFile,
+    @PostMapping("/obtainErrorRateData")
+    public ResponseEntity<String> obtainErrorRateData(@ApiParam(value = "accesslog", required = true)
+                                                      @RequestParam("accesslogFile") MultipartFile accesslogFile,
 
-                           @ApiParam(value = "code", required = true)
-                           @RequestParam("codeFile") MultipartFile codeFile,
+                                                      @ApiParam(value = "code", required = true)
+                                                      @RequestParam("codeFile") MultipartFile codeFile,
 
-                           @ApiParam(value = "以yyyy-MM-dd格式表示的日期", required = true)
-                           @RequestParam("date") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) throws IOException {
+                                                      @ApiParam(value = "以yyyy-MM-dd格式表示的日期", required = true)
+                                                      @RequestParam("date") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) throws IOException {
         try {
             ensureDirectoryExists(OUTPUT_DIRECTORY);
 
-            List<UrlStatusErrorModel> statusModels = processAccesslogFile(accesslogFile);
+            List<UrlStatusErrorModel> statusModels = processAccessLogFile(accesslogFile);
             List<BusinessStatusErrorModel> businessModels = processCodeFile(codeFile, date);
             generateExcelFile(statusModels, businessModels);
 
