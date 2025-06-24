@@ -9,6 +9,7 @@ import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -82,6 +83,10 @@ public class UrlErrorRateController {
     private static final String[] BUSINESS_COLUMN_TITLES = {
             "服务名称", "接口路径", "总请求量", "非10000请求量", "占比"
     };
+
+
+    @Autowired
+    private ElasticsearchQuery elasticsearchQuery;
 
     private static List<BusinessStatusErrorModel> getBusinessStatusErrorModels(MultipartFile file) throws IOException {
         List<BusinessStatusErrorModel> businessStatusErrorModels = new ArrayList<>();
@@ -164,7 +169,7 @@ public class UrlErrorRateController {
                 .filter(x -> "/maintMainline/getBasicMaintainData".equals(x.getUrl()))
                 .findFirst()
                 .ifPresent(x -> x.setErrorRequests(
-                        ElasticsearchQuery.getTotal(
+                        elasticsearchQuery.getTotal(
                                 "ext-website-cl-maint-api",
                                 "/maintMainline/getBasicMaintainData",
                                 date

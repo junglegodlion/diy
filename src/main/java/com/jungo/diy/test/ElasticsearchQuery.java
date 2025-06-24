@@ -1,10 +1,12 @@
 package com.jungo.diy.test;
 
+import com.jungo.diy.config.ElkProperties;
 import kong.unirest.HttpResponse;
 import kong.unirest.JsonNode;
 import kong.unirest.Unirest;
 import kong.unirest.json.JSONArray;
 import kong.unirest.json.JSONObject;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -14,8 +16,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
+
+@Service
 public class ElasticsearchQuery {
 
+    private final ElkProperties elkProperties;
+
+    public ElasticsearchQuery(ElkProperties elkProperties) {
+        this.elkProperties = elkProperties;
+    }
     // 请求头常量
     private static final Map<String, String> DEFAULT_HEADERS = new HashMap<String, String>() {{
         put("accept", "application/json, text/plain, */*");
@@ -27,13 +36,19 @@ public class ElasticsearchQuery {
 
     }};
 
-    public static void main(String[] args) {
-        int total = getTotal("ext-website-cl-maint-api", "/maintMainline/getBasicMaintainData", LocalDate.now());
-        System.out.println(total);
-        // 输出结果
+    private Map<String, String> getDefaultHeaders() {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("accept", "application/json, text/plain, */*");
+        headers.put("accept-language", "zh-CN,zh;q=0.9");
+        headers.put("content-type", "application/json");
+        headers.put("kbn-version", "7.6.1");
+        headers.put("priority", "u=1, i");
+        headers.put("cookie", elkProperties.getCookie());
+        return headers;
     }
 
-    public static int getTotal(String appId, String url, LocalDate localDate) {
+
+    public int getTotal(String appId, String url, LocalDate localDate) {
         String baseUrl = "https://int-service-elk.tuhuyun.cn/elasticsearch/logstash-int-service-server-side-log-*/_search";
 
         // 查询参数
@@ -141,11 +156,11 @@ public class ElasticsearchQuery {
     }
 
 
-    private static HttpResponse<JsonNode> executeQuery(String baseUrl, 
-                                                     Map<String, Object> params, 
-                                                     JSONObject body) {
+    private HttpResponse<JsonNode> executeQuery(String baseUrl,
+                                                Map<String, Object> params,
+                                                JSONObject body) {
         HttpResponse<JsonNode> httpResponse = Unirest.post(baseUrl)
-                .headers(DEFAULT_HEADERS)
+                .headers(getDefaultHeaders())
                 .queryString(params)
                 .body(body.toString())
                 .asJson();
