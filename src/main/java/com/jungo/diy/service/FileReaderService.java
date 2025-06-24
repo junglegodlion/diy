@@ -204,15 +204,33 @@ public class FileReaderService {
             log.error("FileReaderService#writeDataToDatabase,Attempted to write null performance folder model！");
             return;
         }
+        String folderName = performanceFolderModel.getFolderName();
+        if (StringUtils.isBlank(folderName)) {
+            log.error("FileReaderService#writeDataToDatabase,Empty folder name in performance folder model！");
+            return;
+        }
+
+        if (performanceFolderModel.getFiles() == null) {
+            throw new IllegalArgumentException("Performance files data is null");
+        }
+
         try {
-            // >= 2025-01-17 后的数据按照下面的方式进行写入数据库
-            String folderName = performanceFolderModel.getFolderName();
-            if (StringUtils.isEmpty(folderName)) {
-                log.error("FileReaderService#writeDataToDatabase,Empty folder name in performance folder model！");
-                return;
-            }
+            // folderName转化成Date
+            // 创建SimpleDateFormat实例，并指定日期格式
+            Date date = getDateFromString(folderName);
+
+            Map<String, List<List<String>>> fileDataMap = getFileDataMap(performanceFolderModel);
+            // 慢查询文件
+            Map<String, Integer> slowRequestSheetModelMap = getSlowRequestSheetModelMap(fileDataMap);
+            // 请求情况文件
+            List<List<String>> requestSheetModel = deduplicate(fileDataMap.getOrDefault(REQUEST_INFO, Collections.emptyList()));
+
+            // 网关性能数据
+            List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntityList(fileDataMap, date);
+            // 接口性能数据
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntities(requestSheetModel, date, slowRequestSheetModelMap);
             // folderName转化成LocalDate
-            write2DBNew(performanceFolderModel, folderName);
+            write2DBNew(gateWayDailyPerformanceEntities, apiDailyPerformanceEntities);
         } catch (Exception e) {
             log.error("FileReaderService#writeDataToDatabase,Failed to write performance data to DB for folder: {}", performanceFolderModel.getFolderName(), e);
         }
@@ -263,6 +281,11 @@ public class FileReaderService {
         // 接口性能数据
         List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntities(requestSheetModel, date, slowRequestSheetModelMap);
 
+        performanceRepository.writePerformanceData2DB(gateWayDailyPerformanceEntities, apiDailyPerformanceEntities);
+    }
+
+
+    private void write2DBNew(List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities, List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities) {
         performanceRepository.writePerformanceData2DB(gateWayDailyPerformanceEntities, apiDailyPerformanceEntities);
     }
 
