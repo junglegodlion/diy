@@ -1,6 +1,5 @@
 package com.jungo.diy.entity;
 
-import com.jungo.diy.controller.FileReadController;
 import com.jungo.diy.util.DateUtils;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,7 +7,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.temporal.WeekFields;
 import java.util.Date;
 
 /**
