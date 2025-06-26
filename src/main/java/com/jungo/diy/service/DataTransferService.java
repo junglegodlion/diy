@@ -1,0 +1,95 @@
+package com.jungo.diy.service;
+
+import com.jungo.diy.entity.CoreInterfaceConfigEntity;
+import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
+import com.jungo.diy.remote.request.CoreInterfaceConfigRequest;
+import kong.unirest.HttpResponse;
+import kong.unirest.JsonNode;
+import kong.unirest.Unirest;
+import kong.unirest.UnirestException;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * @author lichuang3
+ * @date 2025-06-26 14:55
+ */
+@Service
+@Slf4j
+public class DataTransferService {
+
+    @Autowired
+    private CoreInterfaceConfigMapper configMapper;
+    public Boolean transferCoreInterfaceConfig() {
+        // 首先从数据库中获取核心接口配置
+        List<CoreInterfaceConfigEntity> coreInterfaceConfigByInterfaceTypes = new ArrayList<>();
+        List<CoreInterfaceConfigEntity> coreInterfaceConfigByInterfaceType1 = configMapper.getCoreInterfaceConfigByInterfaceType(1);
+        List<CoreInterfaceConfigEntity> coreInterfaceConfigByInterfaceType2 = configMapper.getCoreInterfaceConfigByInterfaceType(2);
+        List<CoreInterfaceConfigEntity> coreInterfaceConfigByInterfaceType3 = configMapper.getCoreInterfaceConfigByInterfaceType(3);
+        List<CoreInterfaceConfigEntity> coreInterfaceConfigByInterfaceType4 = configMapper.getCoreInterfaceConfigByInterfaceType(4);
+        List<CoreInterfaceConfigEntity> coreInterfaceConfigByInterfaceType5 = configMapper.getCoreInterfaceConfigByInterfaceType(5);
+        coreInterfaceConfigByInterfaceTypes.addAll(coreInterfaceConfigByInterfaceType1);
+        coreInterfaceConfigByInterfaceTypes.addAll(coreInterfaceConfigByInterfaceType2);
+        coreInterfaceConfigByInterfaceTypes.addAll(coreInterfaceConfigByInterfaceType3);
+        coreInterfaceConfigByInterfaceTypes.addAll(coreInterfaceConfigByInterfaceType4);
+        coreInterfaceConfigByInterfaceTypes.addAll(coreInterfaceConfigByInterfaceType5);
+
+        // 按interfaceType升序排序，再按sortOrder升序排序
+        List<CoreInterfaceConfigEntity> sortedList = coreInterfaceConfigByInterfaceTypes.stream()
+                .sorted(Comparator.comparing(CoreInterfaceConfigEntity::getInterfaceType)
+                        .thenComparing(CoreInterfaceConfigEntity::getSortOrder))
+                .collect(Collectors.toList());
+
+        // 转化成远程接口入参
+        List<CoreInterfaceConfigRequest> coreInterfaceConfigRequests = convert2CoreInterfaceConfigRequests(sortedList);
+
+        // 使用Unirest调用远程接口
+        try {
+            HttpResponse<JsonNode> response = Unirest.post("http://localhost:9000/api/configs/batchSave")
+                    .header("Content-Type", "application/json")
+                    .body(coreInterfaceConfigRequests)  // 自动序列化为JSON
+                    .asJson();
+
+            if (response.getStatus() == 200) {
+                log.info("接口调用成功: {}", response.getBody());
+                return true;
+            } else {
+                log.error("接口调用失败: {} - {}", response.getStatus(), response.getStatusText());
+                return false;
+            }
+        } catch (UnirestException e) {
+            log.error("调用远程接口异常", e);
+            return false;
+        }
+
+    }
+
+    private List<CoreInterfaceConfigRequest> convert2CoreInterfaceConfigRequests(List<CoreInterfaceConfigEntity> coreInterfaceConfigEntities) {
+        if (CollectionUtils.isEmpty(coreInterfaceConfigEntities)) {
+            return Collections.emptyList();
+        }
+
+        return coreInterfaceConfigEntities.stream()
+                .map(configEntity -> {
+                    CoreInterfaceConfigRequest request = new CoreInterfaceConfigRequest();
+                    request.setPageName(configEntity.getPageName());
+                    request.setInterfaceUrl(configEntity.getInterfaceUrl());
+                    request.setP99Target(configEntity.getP99Target());
+                    request.setSlowRequestRateTarget(configEntity.getSlowRequestRateTarget());
+                    request.setInterfaceType(configEntity.getInterfaceType());
+                    request.setSortOrder(configEntity.getSortOrder());
+                    request.setOwner(configEntity.getOwner());
+                    request.setHost(configEntity.getHost());
+                    return request;
+                })
+                .collect(Collectors.toList());
+    }
+}
