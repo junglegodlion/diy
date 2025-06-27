@@ -120,15 +120,9 @@ public class DataTransferService {
                             return byteLength <= 200;
                         }).collect(Collectors.toList());
 
-                for (ApiDailyPerformanceEntity batchRecord : batchRecords) {
-                    String url = batchRecord.getUrl();
-                    int byteLength = url.getBytes(StandardCharsets.UTF_8).length;
-                    if (byteLength > 200) {
-                        log.error("DataTransferService#transferApiDailyPerformance,字符过长，为【{}】", batchRecord.getHost() + batchRecord.getUrl());
-                    }
+                if (batchRecords.isEmpty()) {
+                    continue;
                 }
-
-                if (batchRecords.isEmpty()) continue;
 
                 BatchImportApiDailyPerformanceRequest request = convert2BatchImportApiDailyPerformanceRequest(batchRecords, currentStart, currentEnd);
 
