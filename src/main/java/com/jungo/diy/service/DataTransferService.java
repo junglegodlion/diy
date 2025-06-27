@@ -1,7 +1,11 @@
 package com.jungo.diy.service;
 
+import com.jungo.diy.entity.ApiDailyPerformanceEntity;
 import com.jungo.diy.entity.CoreInterfaceConfigEntity;
+import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
+import com.jungo.diy.remote.model.ApiDailyPerformanceModel;
+import com.jungo.diy.remote.request.BatchImportApiDailyPerformanceRequest;
 import com.jungo.diy.remote.request.CoreInterfaceConfigRequest;
 import kong.unirest.HttpResponse;
 import kong.unirest.JsonNode;
@@ -28,6 +32,10 @@ public class DataTransferService {
 
     @Autowired
     private CoreInterfaceConfigMapper configMapper;
+
+    @Autowired
+    private ApiDailyPerformanceMapper apiDailyPerformanceMapper;
+
     public Boolean transferCoreInterfaceConfig() {
         // 首先从数据库中获取核心接口配置
         List<CoreInterfaceConfigEntity> coreInterfaceConfigByInterfaceTypes = new ArrayList<>();
@@ -91,5 +99,75 @@ public class DataTransferService {
                     return request;
                 })
                 .collect(Collectors.toList());
+    }
+
+    public Boolean transferApiDailyPerformance() {
+
+        int start = 4761;
+        int end = 752501;
+        int batchSize = 1000;
+        for (int currentStart = start; currentStart <= end; currentStart += batchSize) {
+            int currentEnd = Math.min(currentStart + batchSize - 1, end);
+
+            try {
+                // 添加1秒休眠
+                Thread.sleep(1000);
+                List<ApiDailyPerformanceEntity> batchRecords = apiDailyPerformanceMapper.getRecordsByPkidRange(currentStart, currentEnd);
+                if (batchRecords.isEmpty()) continue;
+
+                BatchImportApiDailyPerformanceRequest request = convert2BatchImportApiDailyPerformanceRequest(batchRecords, currentStart, currentEnd);
+
+                HttpResponse<JsonNode> response = Unirest.post("http://localhost:9000/api/dailyPerformance/batchImport")
+                        .header("Content-Type", "application/json")
+                        .body(request)
+                        .asJson();
+
+                if (response.getStatus() != 200) {
+                    log.error("批次{}-{}处理失败: {} - {}", currentStart, currentEnd, response.getStatus(), response.getStatusText());
+                    return false;
+                }
+
+                log.info("批次{}-{}处理成功", currentStart, currentEnd);
+            } catch (Exception e) {
+                log.error("批次{}-{}处理异常", currentStart, currentEnd, e);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private BatchImportApiDailyPerformanceRequest convert2BatchImportApiDailyPerformanceRequest(List<ApiDailyPerformanceEntity> recordsByPkidRange,
+                                                                                                long startId,
+                                                                                                long endId) {
+        BatchImportApiDailyPerformanceRequest request = new BatchImportApiDailyPerformanceRequest();
+        request.setStartId(startId);
+        request.setEndId(endId);
+
+        if (CollectionUtils.isEmpty(recordsByPkidRange)) {
+            request.setApiDailyPerformanceModels(Collections.emptyList());
+            return request;
+        }
+
+        List<ApiDailyPerformanceModel> dataList = recordsByPkidRange.stream()
+                .map(entity -> {
+                    ApiDailyPerformanceModel data = new ApiDailyPerformanceModel();
+                    data.setHost(entity.getHost());
+                    data.setUrl(entity.getUrl());
+                    data.setP99(entity.getP99());
+                    data.setP999(entity.getP999());
+                    data.setP90(entity.getP90());
+                    data.setP75(entity.getP75());
+                    data.setP50(entity.getP50());
+                    data.setP95(entity.getP95());
+                    data.setTotalRequestCount(entity.getTotalRequestCount());
+                    data.setSlowRequestCount(entity.getSlowRequestCount());
+                    data.setDate(entity.getDate());
+                    return data;
+                })
+                .collect(Collectors.toList());
+
+        request.setApiDailyPerformanceModels(dataList);
+        return request;
     }
 }

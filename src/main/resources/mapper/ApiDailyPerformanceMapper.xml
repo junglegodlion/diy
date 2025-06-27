@@ -55,4 +55,14 @@
     <select id="getSlowRequestRate" resultMap="BaseResultMap">
         SELECT * FROM api_daily_performance WHERE url = #{url} AND date BETWEEN #{startDate} AND #{endDate}
     </select>
+
+    <select id="getRecordsByPkidRange" resultMap="BaseResultMap">
+        SELECT * FROM api_daily_performance
+        <where>
+            <if test="startId != null and endId != null">
+                id BETWEEN #{startId} AND #{endId}
+            </if>
+        </where>
+        ORDER BY id ASC
+    </select>
 </mapper>
