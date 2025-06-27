@@ -16,6 +16,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -103,8 +104,8 @@ public class DataTransferService {
 
     public Boolean transferApiDailyPerformance() {
 
-        int start = 4761;
-        int end = 752501;
+        int start = 694761;
+        int end = 699760;
         int batchSize = 1000;
         for (int currentStart = start; currentStart <= end; currentStart += batchSize) {
             int currentEnd = Math.min(currentStart + batchSize - 1, end);
@@ -112,7 +113,21 @@ public class DataTransferService {
             try {
                 // 添加1秒休眠
                 Thread.sleep(1000);
-                List<ApiDailyPerformanceEntity> batchRecords = apiDailyPerformanceMapper.getRecordsByPkidRange(currentStart, currentEnd);
+                List<ApiDailyPerformanceEntity> batchRecords = apiDailyPerformanceMapper.getRecordsByPkidRange(currentStart, currentEnd)
+                        .stream().filter(x -> {
+                            String url = x.getUrl();
+                            int byteLength = url.getBytes(StandardCharsets.UTF_8).length;
+                            return byteLength <= 200;
+                        }).collect(Collectors.toList());
+
+                for (ApiDailyPerformanceEntity batchRecord : batchRecords) {
+                    String url = batchRecord.getUrl();
+                    int byteLength = url.getBytes(StandardCharsets.UTF_8).length;
+                    if (byteLength > 200) {
+                        log.error("DataTransferService#transferApiDailyPerformance,字符过长，为【{}】", batchRecord.getHost() + batchRecord.getUrl());
+                    }
+                }
+
                 if (batchRecords.isEmpty()) continue;
 
                 BatchImportApiDailyPerformanceRequest request = convert2BatchImportApiDailyPerformanceRequest(batchRecords, currentStart, currentEnd);

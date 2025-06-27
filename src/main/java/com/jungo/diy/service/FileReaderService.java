@@ -261,30 +261,6 @@ public class FileReaderService {
         return new ArrayList<>(tokenMap.values());
     }
 
-    private void write2DBNew(PerformanceFolderModel performanceFolderModel, String folderName) {
-        if (performanceFolderModel == null || performanceFolderModel.getFiles() == null) {
-            throw new IllegalArgumentException("Performance files data is null");
-        }
-        // folderName转化成Date
-        // 创建SimpleDateFormat实例，并指定日期格式
-        Date date = getDateFromString(folderName);
-
-        Map<String, List<List<String>>> fileDataMap = getFileDataMap(performanceFolderModel);
-        // 慢查询文件
-        Map<String, Integer> slowRequestSheetModelMap = getSlowRequestSheetModelMap(fileDataMap);
-        // 请求情况文件
-        List<List<String>> requestSheetModel = deduplicate(fileDataMap.getOrDefault(REQUEST_INFO, Collections.emptyList()));
-
-
-        // 网关性能数据
-        List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities = getGateWayDailyPerformanceEntityList(fileDataMap, date);
-        // 接口性能数据
-        List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = getApiDailyPerformanceEntities(requestSheetModel, date, slowRequestSheetModelMap);
-
-        performanceRepository.writePerformanceData2DB(gateWayDailyPerformanceEntities, apiDailyPerformanceEntities);
-    }
-
-
     private void write2DBNew(List<GateWayDailyPerformanceEntity> gateWayDailyPerformanceEntities, List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities) {
         performanceRepository.writePerformanceData2DB(gateWayDailyPerformanceEntities, apiDailyPerformanceEntities);
     }
