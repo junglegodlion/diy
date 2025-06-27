@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -20,4 +21,6 @@ public interface GateWayDailyPerformanceMapper {
     List<GateWayDailyPerformanceEntity> getPerformanceByYear(@Param("host") String host, @Param("startDate") LocalDate startDate);
 
     List<GateWayDailyPerformanceEntity> getPerformanceByDate(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDat);
+
+    List<GateWayDailyPerformanceEntity> getRecordsByPkidRange(@Param("startId") long startId, @Param("endId") long endId);
 }

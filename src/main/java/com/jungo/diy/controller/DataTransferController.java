@@ -47,5 +47,15 @@ public class DataTransferController {
     public Boolean transferApiDailyPerformance() {
         return dataTransferService.transferApiDailyPerformance();
     }
+
+    @ApiOperation(value = "传输网关日常性能数据", notes = "将网关日常性能数据从源系统同步到目标系统")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "操作成功", response = Boolean.class),
+            @ApiResponse(code = 500, message = "系统内部错误")
+    })
+    @GetMapping("/transferGateWayDailyPerformance")
+    public Boolean transferGateWayDailyPerformance() {
+        return dataTransferService.transferGateWayDailyPerformance();
+    }
     
 }

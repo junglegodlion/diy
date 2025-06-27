@@ -2,10 +2,14 @@ package com.jungo.diy.service;
 
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
 import com.jungo.diy.entity.CoreInterfaceConfigEntity;
+import com.jungo.diy.entity.GateWayDailyPerformanceEntity;
 import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.mapper.CoreInterfaceConfigMapper;
+import com.jungo.diy.mapper.GateWayDailyPerformanceMapper;
 import com.jungo.diy.remote.model.ApiDailyPerformanceModel;
+import com.jungo.diy.remote.model.GateWayDailyPerformanceModel;
 import com.jungo.diy.remote.request.BatchImportApiDailyPerformanceRequest;
+import com.jungo.diy.remote.request.BatchImportGateWayDailyPerformanceRequest;
 import com.jungo.diy.remote.request.CoreInterfaceConfigRequest;
 import kong.unirest.HttpResponse;
 import kong.unirest.JsonNode;
@@ -36,6 +40,9 @@ public class DataTransferService {
 
     @Autowired
     private ApiDailyPerformanceMapper apiDailyPerformanceMapper;
+
+    @Autowired
+    private GateWayDailyPerformanceMapper gateWayDailyPerformanceMapper;
 
     public Boolean transferCoreInterfaceConfig() {
         // 首先从数据库中获取核心接口配置
@@ -177,6 +184,83 @@ public class DataTransferService {
                 .collect(Collectors.toList());
 
         request.setApiDailyPerformanceModels(dataList);
+        return request;
+    }
+
+    public Boolean transferGateWayDailyPerformance() {
+        // 根据实际业务调整起始ID
+        int start = 1;
+        // 根据实际业务调整结束ID
+        int end = 691;
+        // 每批次处理数量
+        int batchSize = 500;
+
+        for (int currentStart = start; currentStart <= end; currentStart += batchSize) {
+            int currentEnd = Math.min(currentStart + batchSize - 1, end);
+
+            try {
+                // 适当休眠避免压力过大
+                Thread.sleep(1000);
+
+                // 批量查询数据并过滤
+                List<GateWayDailyPerformanceEntity> batchRecords = gateWayDailyPerformanceMapper.getRecordsByPkidRange(currentStart, currentEnd);
+
+                if (batchRecords.isEmpty()) {
+                    continue;
+                }
+
+                // 构建并发送请求
+                BatchImportGateWayDailyPerformanceRequest request = convert2BatchImportGateWayDailyPerformanceRequest(
+                        batchRecords, currentStart, currentEnd);
+
+                HttpResponse<JsonNode> response = Unirest.post("http://localhost:9000/api/gateWayDailyPerformance/batchImport")
+                        .header("Content-Type", "application/json")
+                        .body(request)
+                        .asJson();
+
+                if (response.getStatus() != 200) {
+                    log.error("网关性能数据导入失败 {}-{}: {}", currentStart, currentEnd, response.getStatusText());
+                    return false;
+                }
+
+                log.info("成功处理网关性能数据 {}-{}", currentStart, currentEnd);
+            } catch (Exception e) {
+                log.error("处理网关性能数据异常 {}-{}", currentStart, currentEnd, e);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private BatchImportGateWayDailyPerformanceRequest convert2BatchImportGateWayDailyPerformanceRequest(List<GateWayDailyPerformanceEntity> batchRecords,
+                                                                                                        int currentStart,
+                                                                                                        int currentEnd) {
+        BatchImportGateWayDailyPerformanceRequest request = new BatchImportGateWayDailyPerformanceRequest();
+        request.setStartId(currentStart);
+        request.setEndId(currentEnd);
+
+        if (CollectionUtils.isEmpty(batchRecords)) {
+            request.setGateWayDailyPerformanceModels(Collections.emptyList());
+            return request;
+        }
+
+        List<GateWayDailyPerformanceModel> dataList = batchRecords.stream()
+                .map(entity -> {
+                    GateWayDailyPerformanceModel data = new GateWayDailyPerformanceModel();
+                    data.setHost(entity.getHost());
+                    data.setP99(entity.getP99());
+                    data.setP999(entity.getP999());
+                    data.setP90(entity.getP90());
+                    data.setP75(entity.getP75());
+                    data.setP50(entity.getP50());
+                    data.setTotalRequestCount(entity.getTotalRequestCount());
+                    data.setSlowRequestCount(entity.getSlowRequestCount());
+                    data.setDate(entity.getDate());
+                    return data;
+                })
+                .collect(Collectors.toList());
+
+        request.setGateWayDailyPerformanceModels(dataList);
         return request;
     }
 }
