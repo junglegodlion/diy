@@ -5,6 +5,8 @@ import com.jungo.diy.model.UrlStatusErrorModel;
 import com.jungo.diy.test.ElasticsearchQuery;
 import com.jungo.diy.util.CsvUtils;
 import com.jungo.diy.util.TableUtils;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -37,6 +39,7 @@ import java.util.stream.Stream;
  * @author lichuang3
  * @date 2025-04-25 15:31
  */
+@Api(tags = "接口错误率统计")
 @RestController
 @Slf4j
 @RequestMapping("/urlErrorRate")
@@ -80,7 +83,7 @@ public class UrlErrorRateController {
             "host", "url", "status", "请求次数", "请求总数", "占比", "非200占比"
     };
     private static final String[] BUSINESS_COLUMN_TITLES = {
-            "服务名称", "接口路径", "总请求量", "非10000请求量", "占比"
+            "服务名称", "接口路径", "总请求量", "非10000请求量", "非10000占比", "10000占比"
     };
 
 
@@ -226,10 +229,20 @@ public class UrlErrorRateController {
                         case 2: cell.setCellValue(model.getTotalRequests()); break;
                         case 3: cell.setCellValue(model.getErrorRequests()); break;
                         case 4: cell.setCellValue(model.getErrorRate()); break;
+                        case 5: cell.setCellValue(model.getNormalRequestRate()); break;
                     }
                 });
     }
 
+    /**
+     * 获取接口错误率数据并生成Excel报表
+     * @param accesslogFile 访问日志文件
+     * @param codeFile 业务错误码文件
+     * @param date 统计日期(yyyy-MM-dd)
+     * @return 处理结果
+     * @throws IOException 文件处理异常
+     */
+    @ApiOperation(value = "获取接口错误率数据", notes = "处理访问日志和业务错误码文件，生成包含状态码错误率和业务异常错误率的Excel报表")
     @PostMapping("/obtainErrorRateData")
     public ResponseEntity<String> obtainErrorRateData(@ApiParam(value = "accesslog", required = true)
                                                       @RequestParam("accesslogFile") MultipartFile accesslogFile,

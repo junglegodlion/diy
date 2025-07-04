@@ -19,11 +19,17 @@ public class BusinessStatusErrorModel {
     private int errorRequests;
     // 业务异常率
     private float errorRate;
+    // 正常请求率
+    private float normalRequestRate;
 
     public float getErrorRate() {
         if (totalRequests == 0) {
             return 0.0f;
         }
         return (float) errorRequests / totalRequests;
+    }
+
+    public float getNormalRequestRate() {
+        return 1 - getErrorRate();
     }
 }

@@ -111,8 +111,8 @@ public class DataTransferService {
 
     public Boolean transferApiDailyPerformance() {
 
-        int start = 694761;
-        int end = 699760;
+        int start = 752501;
+        int end = 798177;
         int batchSize = 1000;
         for (int currentStart = start; currentStart <= end; currentStart += batchSize) {
             int currentEnd = Math.min(currentStart + batchSize - 1, end);
@@ -189,9 +189,9 @@ public class DataTransferService {
 
     public Boolean transferGateWayDailyPerformance() {
         // 根据实际业务调整起始ID
-        int start = 1;
+        int start = 692;
         // 根据实际业务调整结束ID
-        int end = 691;
+        int end = 706;
         // 每批次处理数量
         int batchSize = 500;
 
