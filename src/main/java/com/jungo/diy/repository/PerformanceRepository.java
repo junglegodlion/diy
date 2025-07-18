@@ -90,7 +90,16 @@ public class PerformanceRepository {
     }
 
     /**
-     * 将 ApiDailyPerformanceEntity 列表转换为 Map<String, InterfacePerformanceModel>
+     * 将API性能数据实体列表转换为以Token为key的性能模型Map
+     *
+     * 注：
+     * 1. 使用host和url组合生成唯一Token作为Map的key
+     * 2. 对重复key采取保留已有值的策略
+     *
+     * @param entities API性能数据实体列表
+     * @return Map<String, InterfacePerformanceModel>
+     *         key: 由host和url生成的Token
+     *         value: 包含性能指标数据的模型对象
      */
     private Map<String, InterfacePerformanceModel> convertToPerformanceMap(List<ApiDailyPerformanceEntity> entities) {
         return entities.stream().collect(Collectors.toMap(
@@ -102,6 +111,7 @@ public class PerformanceRepository {
                     model.setUrl(entity.getUrl());
                     model.setTotalRequestCount(entity.getTotalRequestCount());
                     model.setP99(entity.getP99());
+                    model.setP90(entity.getP90());
                     model.setSlowRequestCount(entity.getSlowRequestCount());
                     return model;
                 },
@@ -138,6 +148,8 @@ public class PerformanceRepository {
         urlPerformanceResponse.setUrl(urlPerformanceModel.getUrl());
         urlPerformanceResponse.setLastWeekP99(urlPerformanceModel.getLastWeek().getP99());
         urlPerformanceResponse.setThisWeekP99(urlPerformanceModel.getThisWeek().getP99());
+        urlPerformanceResponse.setLastWeekP90(urlPerformanceModel.getLastWeek().getP90());
+        urlPerformanceResponse.setThisWeekP90(urlPerformanceModel.getThisWeek().getP90());
         urlPerformanceResponse.setLastWeekTotalRequestCount(urlPerformanceModel.getLastWeek().getTotalRequestCount());
         urlPerformanceResponse.setThisWeekTotalRequestCount(urlPerformanceModel.getThisWeek().getTotalRequestCount());
         urlPerformanceResponse.setLastWeekSlowRequestRate(urlPerformanceModel.getLastWeek().getSlowRequestRate());

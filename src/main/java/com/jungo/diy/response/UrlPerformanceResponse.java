@@ -21,6 +21,10 @@ public class UrlPerformanceResponse {
     private Integer lastWeekP99;
     // 本周99线
     private Integer thisWeekP99;
+    // 上周90线
+    private Integer lastWeekP90;
+    // 本周90线
+    private Integer thisWeekP90;
     // 上周调用量
     private Integer lastWeekTotalRequestCount;
     // 本周调用量

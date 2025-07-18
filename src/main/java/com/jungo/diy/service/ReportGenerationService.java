@@ -56,16 +56,18 @@ public class ReportGenerationService {
         public static final int URL = 1;
         public static final int LAST_WEEK_P99 = 2;
         public static final int THIS_WEEK_P99 = 3;
-        public static final int LAST_WEEK_COUNT = 4;
-        public static final int THIS_WEEK_COUNT = 5;
-        public static final int LAST_WEEK_SLOW_RATE = 6;
-        public static final int THIS_WEEK_SLOW_RATE = 7;
-        public static final int P99_CHANGE = 8;
-        public static final int P99_CHANGE_RATE = 9;
+        public static final int LAST_WEEK_P90 = 4;
+        public static final int THIS_WEEK_P90 = 5;
+        public static final int LAST_WEEK_COUNT = 6;
+        public static final int THIS_WEEK_COUNT = 7;
+        public static final int LAST_WEEK_SLOW_RATE = 8;
+        public static final int THIS_WEEK_SLOW_RATE = 9;
+        public static final int P99_CHANGE = 10;
+        public static final int P99_CHANGE_RATE = 11;
         // 仅关键链路表使用
-        public static final int P99_TARGET = 10;
+        public static final int P99_TARGET = 12;
         // 仅关键链路表使用
-        public static final int REACH_TARGET = 11;
+        public static final int REACH_TARGET = 13;
     }
 
     /**
@@ -551,6 +553,8 @@ public class ReportGenerationService {
                 "接口",
                 dateStrings[0] + "日99线",
                 dateStrings[1] + "日99线",
+                dateStrings[0] + "日90线",
+                dateStrings[1] + "日90线",
                 dateStrings[0] + "日调用量",
                 dateStrings[1] + "日调用量",
                 dateStrings[0] + "慢请求(300ms)率",
@@ -591,6 +595,8 @@ public class ReportGenerationService {
         row.getCell(TableColumns.URL).setText(entity.getUrl());
         row.getCell(TableColumns.LAST_WEEK_P99).setText(String.valueOf(entity.getLastWeekP99()));
         row.getCell(TableColumns.THIS_WEEK_P99).setText(String.valueOf(entity.getThisWeekP99()));
+        row.getCell(TableColumns.LAST_WEEK_P90).setText(String.valueOf(entity.getLastWeekP90()));
+        row.getCell(TableColumns.THIS_WEEK_P90).setText(String.valueOf(entity.getThisWeekP90()));
         row.getCell(TableColumns.LAST_WEEK_COUNT).setText(String.valueOf(entity.getLastWeekTotalRequestCount()));
         row.getCell(TableColumns.THIS_WEEK_COUNT).setText(String.valueOf(entity.getThisWeekTotalRequestCount()));
         row.getCell(TableColumns.LAST_WEEK_SLOW_RATE).setText(TableUtils.getPercentageFormatDouble(entity.getLastWeekSlowRequestRate()));

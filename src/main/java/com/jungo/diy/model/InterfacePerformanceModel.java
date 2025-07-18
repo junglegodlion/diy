@@ -16,6 +16,8 @@ public class InterfacePerformanceModel {
     private String url;
     // 99线
     private Integer p99;
+    // 90线
+    private Integer p90;
     // 总调用数量
     private Integer totalRequestCount;
     // 慢请求数
