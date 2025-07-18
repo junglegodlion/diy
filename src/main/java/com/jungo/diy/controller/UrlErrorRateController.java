@@ -1,9 +1,12 @@
 package com.jungo.diy.controller;
 
+import com.jungo.diy.constants.FileConstants;
 import com.jungo.diy.model.BusinessStatusErrorModel;
 import com.jungo.diy.model.UrlStatusErrorModel;
+import com.jungo.diy.service.FileService;
 import com.jungo.diy.test.ElasticsearchQuery;
 import com.jungo.diy.util.CsvUtils;
+import com.jungo.diy.util.FileUtils;
 import com.jungo.diy.util.TableUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -35,6 +38,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.jungo.diy.constants.FileConstants.BUSINESS_COLUMN_TITLES;
+import static com.jungo.diy.constants.FileConstants.STATUS_COLUMN_TITLES;
+import static com.jungo.diy.constants.FileConstants.SUCCESS_COLUMN_TITLES;
+
 /**
  * @author lichuang3
  * @date 2025-04-25 15:31
@@ -45,156 +52,8 @@ import java.util.stream.Stream;
 @RequestMapping("/urlErrorRate")
 public class UrlErrorRateController {
 
-    private static final String[] STATUS_CODE_URLS = {
-            "/cl-list-aggregator/channel/getChannelModuleInfo",
-            "/mlp-product-search-api/module/search/pageListAndFilter",
-            "/cl-tire-site/tireListModule/getTireList",
-            "/cl-maint-api/maintMainline/getBasicMaintainData",
-            "/cl-maint-mainline/mainline/getDynamicData",
-            "/cl-maint-api/mainline/maintenance/basic",
-            "/cl-oto-front-api/batteryList/getBatteryList",
-            "/mlp-product-search-api/module/search/pageList",
-            "/mlp-product-search-api/main/search/api/mainProduct",
-            "/ext-website-cl-beauty-api/channelPage/v4/getBeautyHomeShopListAndRecommendLabel",
-            "/cl-product-components/GoodsDetail/detailModuleInfo",
-            "/cl-tire-site/tireModule/getTireDetailModuleData",
-            "/cl-maint-mainline/productMainline/getMaintProductDetailInfo",
-            "/cl-product-components/GoodsDetail/productDetailModularInfoForBff",
-            "/cl-maint-order-create/order/getConfirmOrderData"
-    };
-
-    private static final String[] BUSINESS_ERROR_URLS = {
-            "/channel/getChannelModuleInfo",
-            "/mlp-product-search-api/module/search/pageListAndFilter",
-            "/tireListModule/getTireList",
-            "/maintMainline/getBasicMaintainData",
-            "/mainline/getDynamicData",
-            "/mainline/maintenance/basic",
-            "/batteryList/getBatteryList",
-            "/module/search/pageList",
-            "/main/search/api/mainProduct",
-            "/channelPage/v4/getBeautyHomeShopListAndRecommendLabel",
-            "/GoodsDetail/detailModuleInfo",
-            "/tireModule/getTireDetailModuleData",
-            "/productMainline/getMaintProductDetailInfo",
-            "/GoodsDetail/productDetailModularInfoForBff",
-            "/order/getConfirmOrderData"
-    };
-
-    private static final String OUTPUT_DIRECTORY = System.getProperty("user.home") +
-            "/Desktop/备份/c端网关接口性能统计/数据统计/输出/";
-    private static final String[] STATUS_COLUMN_TITLES = {
-            "host", "url", "status", "请求次数", "请求总数", "占比", "非200占比"
-    };
-    private static final String[] BUSINESS_COLUMN_TITLES = {
-            "服务名称", "接口路径", "总请求量", "非10000请求量", "非10000占比", "10000占比"
-    };
-
-    private static final String[] SUCCESS_COLUMN_TITLES = {
-            "服务名称", "接口路径", "总请求量", "非10000请求量", "非10000占比", "10000占比", "非200占比", "成功率"
-    };
-
     @Autowired
-    private ElasticsearchQuery elasticsearchQuery;
-
-    private static List<BusinessStatusErrorModel> getBusinessStatusErrorModels(MultipartFile file) throws IOException {
-        List<BusinessStatusErrorModel> businessStatusErrorModels = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                // line按照间隙进行分割
-                String[] parts = line.split(" ");
-                if (parts.length < 6) {
-                    continue;
-                }
-                BusinessStatusErrorModel businessStatusError = new BusinessStatusErrorModel();
-                businessStatusError.setAppId(parts[0]);
-                businessStatusError.setUrl(parts[1]);
-                businessStatusError.setTotalRequests(Integer.parseInt(parts[3]));
-                businessStatusError.setErrorRequests(Integer.parseInt(parts[5]));
-                businessStatusErrorModels.add(businessStatusError);
-            }
-        }
-        return businessStatusErrorModels;
-    }
-
-    private void ensureDirectoryExists(String path) throws IOException {
-        File directory = new File(path);
-        if (!directory.exists() && !directory.mkdirs()) {
-            throw new IOException("无法创建目录: " + path);
-        }
-    }
-
-    private List<UrlStatusErrorModel> processAccessLogFile(MultipartFile file) throws IOException {
-        List<List<String>> csvData = CsvUtils.getDataFromInputStream(file.getInputStream());
-
-        return csvData.stream()
-                .skip(1)
-                .map(this::mapToUrlStatusErrorModel)
-                .collect(Collectors.groupingBy(UrlStatusErrorModel::getUrl))
-                .entrySet().stream()
-                .flatMap(this::processUrlStatusGroup)
-                .sorted(this::compareUrlStatusModels)
-                .collect(Collectors.toList());
-    }
-
-    private int compareUrlStatusModels(UrlStatusErrorModel m1, UrlStatusErrorModel m2) {
-        int index1 = Arrays.asList(STATUS_CODE_URLS).indexOf(m1.getUrl());
-        int index2 = Arrays.asList(STATUS_CODE_URLS).indexOf(m2.getUrl());
-        return index1 != index2 ? Integer.compare(index1, index2) :
-                Integer.compare(m1.getStatus(), m2.getStatus());
-    }
-
-    private Stream<UrlStatusErrorModel> processUrlStatusGroup(
-            Map.Entry<String, List<UrlStatusErrorModel>> entry) {
-
-        List<UrlStatusErrorModel> models = entry.getValue();
-        int totalCount = models.stream().mapToInt(UrlStatusErrorModel::getCount).sum();
-        int not200Count = models.stream()
-                .filter(m -> m.getStatus() != 200)
-                .mapToInt(UrlStatusErrorModel::getCount)
-                .sum();
-
-        return models.stream().peek(m -> {
-            m.setTotalCount(totalCount);
-            m.setNot200Count(not200Count);
-        });
-    }
-
-    private UrlStatusErrorModel mapToUrlStatusErrorModel(List<String> row) {
-        UrlStatusErrorModel model = new UrlStatusErrorModel();
-        model.setHost(row.get(0));
-        model.setUrl(row.get(1));
-        model.setStatus(Integer.parseInt(row.get(2)));
-        model.setCount(Integer.parseInt(row.get(3)));
-        return model;
-    }
-
-    private List<BusinessStatusErrorModel> processCodeFile(MultipartFile file, LocalDate date) throws IOException {
-
-        List<BusinessStatusErrorModel> models = getBusinessStatusErrorModels(file);
-
-        models.stream()
-                .filter(x -> "/maintMainline/getBasicMaintainData".equals(x.getUrl()))
-                .findFirst()
-                .ifPresent(x -> x.setErrorRequests(
-                        elasticsearchQuery.getTotal(
-                                "ext-website-cl-maint-api",
-                                "/maintMainline/getBasicMaintainData",
-                                date
-                        )
-                ));
-
-        models.sort(this::compareBusinessModels);
-        return models;
-    }
-
-    private int compareBusinessModels(BusinessStatusErrorModel m1, BusinessStatusErrorModel m2) {
-        int index1 = Arrays.asList(BUSINESS_ERROR_URLS).indexOf(m1.getUrl());
-        int index2 = Arrays.asList(BUSINESS_ERROR_URLS).indexOf(m2.getUrl());
-        return index1 != index2 ? Integer.compare(index1, index2) :
-                Float.compare(m1.getErrorRate(), m2.getErrorRate());
-    }
+    private FileService fileService;
 
     private void generateExcelFile(List<UrlStatusErrorModel> statusModels, List<BusinessStatusErrorModel> businessModels) throws IOException {
 
@@ -204,7 +63,7 @@ public class UrlErrorRateController {
             createSuccessSheet(workbook, businessModels);
 
             String fileName = URLEncoder.encode("httpError.xlsx", StandardCharsets.UTF_8.toString());
-            saveWorkbookToFile(workbook, OUTPUT_DIRECTORY, fileName);
+            saveWorkbookToFile(workbook, FileConstants.OUTPUT_DIRECTORY, fileName);
         }
     }
 
@@ -298,10 +157,10 @@ public class UrlErrorRateController {
                                                       @ApiParam(value = "以yyyy-MM-dd格式表示的日期", required = true)
                                                       @RequestParam("date") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) throws IOException {
         try {
-            ensureDirectoryExists(OUTPUT_DIRECTORY);
+            FileUtils.ensureDirectoryExists(FileConstants.OUTPUT_DIRECTORY);
 
-            List<UrlStatusErrorModel> statusModels = processAccessLogFile(accesslogFile);
-            List<BusinessStatusErrorModel> businessModels = processCodeFile(codeFile, date);
+            List<UrlStatusErrorModel> statusModels = fileService.processAccessLogFile(accesslogFile);
+            List<BusinessStatusErrorModel> businessModels = fileService.processCodeFile(codeFile, date);
 
             businessModels.forEach(model -> {
                 String url = model.getUrl();
