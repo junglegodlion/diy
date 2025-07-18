@@ -27,6 +27,19 @@ public class UrlStatusErrorModel {
     // status非200错误率
     private Float not200errorRate;
 
+    // status非10000错误率
+    private Float not10000errorRate;
+
+    // 成功率
+    // status非10000错误率
+    private Float successRate;
+
+    public float getSuccessRate() {
+        // 使用明确的变量名表示计算逻辑
+        float totalErrorRate = not200errorRate + not10000errorRate;
+        // 使用Math.max确保结果不低于0，防止负数出现
+        return Math.max(0f, 1f - totalErrorRate);
+    }
 
 
 

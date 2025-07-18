@@ -46,9 +46,12 @@ import java.util.stream.Stream;
 public class UrlErrorRateController {
 
     private static final String[] STATUS_CODE_URLS = {
+            "/cl-list-aggregator/channel/getChannelModuleInfo",
+            "/mlp-product-search-api/module/search/pageListAndFilter",
             "/cl-tire-site/tireListModule/getTireList",
             "/cl-maint-api/maintMainline/getBasicMaintainData",
             "/cl-maint-mainline/mainline/getDynamicData",
+            "/cl-maint-api/mainline/maintenance/basic",
             "/cl-oto-front-api/batteryList/getBatteryList",
             "/mlp-product-search-api/module/search/pageList",
             "/mlp-product-search-api/main/search/api/mainProduct",
@@ -57,23 +60,24 @@ public class UrlErrorRateController {
             "/cl-tire-site/tireModule/getTireDetailModuleData",
             "/cl-maint-mainline/productMainline/getMaintProductDetailInfo",
             "/cl-product-components/GoodsDetail/productDetailModularInfoForBff",
-            "/cl-ordering-aggregator/ordering/getOrderConfirmFloatLayerData",
             "/cl-maint-order-create/order/getConfirmOrderData"
     };
 
     private static final String[] BUSINESS_ERROR_URLS = {
+            "/channel/getChannelModuleInfo",
+            "/mlp-product-search-api/module/search/pageListAndFilter",
             "/tireListModule/getTireList",
             "/maintMainline/getBasicMaintainData",
             "/mainline/getDynamicData",
+            "/mainline/maintenance/basic",
             "/batteryList/getBatteryList",
             "/module/search/pageList",
             "/main/search/api/mainProduct",
             "/channelPage/v4/getBeautyHomeShopListAndRecommendLabel",
             "/GoodsDetail/detailModuleInfo",
-            "/getTireDetailModuleData",
+            "/tireModule/getTireDetailModuleData",
             "/productMainline/getMaintProductDetailInfo",
             "/GoodsDetail/productDetailModularInfoForBff",
-            "/ordering/getOrderConfirmFloatLayerData",
             "/order/getConfirmOrderData"
     };
 
@@ -86,6 +90,9 @@ public class UrlErrorRateController {
             "服务名称", "接口路径", "总请求量", "非10000请求量", "非10000占比", "10000占比"
     };
 
+    private static final String[] SUCCESS_COLUMN_TITLES = {
+            "服务名称", "接口路径", "总请求量", "非10000请求量", "非10000占比", "10000占比", "非200占比", "成功率"
+    };
 
     @Autowired
     private ElasticsearchQuery elasticsearchQuery;
@@ -194,10 +201,48 @@ public class UrlErrorRateController {
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
             createStatusSheet(workbook, statusModels);
             createBusinessSheet(workbook, businessModels);
+            createSuccessSheet(workbook, businessModels);
 
             String fileName = URLEncoder.encode("httpError.xlsx", StandardCharsets.UTF_8.toString());
             saveWorkbookToFile(workbook, OUTPUT_DIRECTORY, fileName);
         }
+    }
+
+    /**
+     * 从完整URL中匹配指定路径
+     * @param fullUrl 完整URL 如 "/cl-tire-site/tireModule/getTireDetailModuleData"
+     * @param shortPath 要匹配的路径 如 "/tireModule/getTireDetailModuleData"
+     * @return 是否匹配
+     */
+    public static boolean matchUrl(String fullUrl, String shortPath) {
+        if (fullUrl == null || shortPath == null) {
+            return false;
+        }
+
+        // 去除两边的斜杠统一格式
+        String normalizedFull = fullUrl.replaceAll("^/+|/+$", "");
+        String normalizedShort = shortPath.replaceAll("^/+|/+$", "");
+
+        // 以短路径结尾进行匹配
+        return normalizedFull.endsWith(normalizedShort);
+    }
+
+    private void createSuccessSheet(XSSFWorkbook workbook, List<BusinessStatusErrorModel> models) {
+
+        XSSFSheet sheet = workbook.createSheet("成功率");
+        TableUtils.createChartData(workbook, sheet, models, SUCCESS_COLUMN_TITLES,
+                (model, col, cell) -> {
+                    switch (col) {
+                        case 0: cell.setCellValue(model.getAppId()); break;
+                        case 1: cell.setCellValue(model.getUrl()); break;
+                        case 2: cell.setCellValue(model.getTotalRequests()); break;
+                        case 3: cell.setCellValue(model.getErrorRequests()); break;
+                        case 4: cell.setCellValue(model.getErrorRate()); break;
+                        case 5: cell.setCellValue(model.getNormalRequestRate()); break;
+                        case 6: cell.setCellValue(model.getNot200errorRate()); break;
+                        case 7: cell.setCellValue(model.getSuccessRate()); break;
+                    }
+                });
     }
 
     private void createStatusSheet(XSSFWorkbook workbook, List<UrlStatusErrorModel> models) {
@@ -257,6 +302,15 @@ public class UrlErrorRateController {
 
             List<UrlStatusErrorModel> statusModels = processAccessLogFile(accesslogFile);
             List<BusinessStatusErrorModel> businessModels = processCodeFile(codeFile, date);
+
+            businessModels.forEach(model -> {
+                String url = model.getUrl();
+                UrlStatusErrorModel urlStatusErrorModel = statusModels.stream().filter(x -> matchUrl(x.getUrl(), url)).findFirst().orElse(null);
+                if (urlStatusErrorModel != null) {
+                    model.setNot200errorRate(urlStatusErrorModel.getNot200errorRate());
+                }
+            });
+
             generateExcelFile(statusModels, businessModels);
 
             return ResponseEntity.ok("文件处理成功");
