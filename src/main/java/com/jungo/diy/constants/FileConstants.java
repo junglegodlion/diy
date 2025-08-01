@@ -30,7 +30,7 @@ public class FileConstants {
 
     public static final String[] BUSINESS_ERROR_URLS = {
             "/channel/getChannelModuleInfo",
-            "/mlp-product-search-api/module/search/pageListAndFilter",
+            "/module/search/pageListAndFilter",
             "/tireListModule/getTireList",
             "/maintMainline/getBasicMaintainData",
             "/mainline/getDynamicData",

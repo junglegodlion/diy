@@ -18,7 +18,6 @@ import org.apache.poi.xwpf.usermodel.*;
 import org.apache.xmlbeans.XmlException;
 import org.openxmlformats.schemas.drawingml.x2006.chart.CTDLbls;
 import org.openxmlformats.schemas.drawingml.x2006.chart.STDLblPos;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSimpleField;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyles;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,7 +31,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.time.Month;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -241,7 +239,7 @@ public class ReportGenerationService {
     private void generateGatewayPerformanceSection(XWPFDocument document, PerformanceResult result, LocalDate startDate, LocalDate endDate) {
         List<Section> sections = Arrays.asList(
                 new Section("cl-gateway 月平均慢请求率", d ->
-                        drawGatewayMonthlyAverageSlowRequestRateTable(d, result.getGatewayAverageSlowRequestRate())
+                        drawGatewayMonthlyAverageSlowRequestRateTable(d, result.getGatewayAverageSlowRequestRate(), endDate)
                 ),
                 new Section(startDate, endDate, "cl-gateway 大盘数据情况（最近7天）", d -> {
                     drawWeeklyMarketDataSituationTable(d, result.getWeeklyMarketDataSituationData());
@@ -676,9 +674,11 @@ public class ReportGenerationService {
         newStyles.setStyles(wordStyles);
     }
 
-    private static void drawGatewayMonthlyAverageSlowRequestRateTable(XWPFDocument document, List<SlowRequestRateModel> gatewayAverageSlowRequestRate) {
+    private static void drawGatewayMonthlyAverageSlowRequestRateTable(XWPFDocument document,
+                                                                      List<SlowRequestRateModel> gatewayAverageSlowRequestRate,
+                                                                      LocalDate endDate) {
         // 获取当前月份
-        int currentMonth = LocalDate.now().getMonthValue();
+        int currentMonth = endDate.getMonthValue();
         XWPFTable table = TableUtils.createXwpfTable(document, 2, currentMonth);
         // 设置表格表头
         XWPFTableRow headerRow = table.getRow(0);

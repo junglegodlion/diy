@@ -48,7 +48,11 @@ public class ElasticsearchQuery {
     }
 
 
-    public int getTotal(String appId, String url, LocalDate localDate) {
+    public int getTotal(String appId,
+                        String url,
+                        LocalDate localDate,
+                        Boolean mustNot,
+                        String mustNotContent) {
         String baseUrl = "https://int-service-elk.tuhuyun.cn/elasticsearch/logstash-int-service-server-side-log-*/_search";
 
         // 查询参数
@@ -78,8 +82,9 @@ public class ElasticsearchQuery {
                 appId,
                 url,
                 startTime,
-                endTime
-        );
+                endTime,
+                mustNot,
+                mustNotContent);
 
         // 执行查询
         HttpResponse<JsonNode> response = executeQuery(baseUrl, queryParams, requestBody);
@@ -94,7 +99,9 @@ public class ElasticsearchQuery {
     private static JSONObject buildRequestBody(String appId,
                                                String targetUrl,
                                                String startTime,
-                                               String endTime) {
+                                               String endTime,
+                                               Boolean mustNot,
+                                               String mustNotContent) {
         // 时间范围条件
         JSONObject range = new JSONObject();
         range.put("gte", startTime);
@@ -109,9 +116,12 @@ public class ElasticsearchQuery {
                 new JSONObject().put("match_phrase", new JSONObject().put("request_target_url", targetUrl)),
                 new JSONObject().put("range", new JSONObject().put("@timestamp", range))
         });
-        bool.put("must_not", new JSONObject[]{
-                new JSONObject().put("match_phrase", new JSONObject().put("response_data", "Code=1"))
-        });
+        if (mustNot) {
+            bool.put("must_not", new JSONObject[]{
+                    new JSONObject().put("match_phrase", new JSONObject().put("response_data", mustNotContent))
+            });
+        }
+
 
         // 排序条件
         JSONObject timestampSort = new JSONObject();

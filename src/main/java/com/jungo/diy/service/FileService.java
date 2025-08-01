@@ -137,12 +137,29 @@ public class FileService {
                         elasticsearchQuery.getTotal(
                                 "ext-website-cl-maint-api",
                                 "/maintMainline/getBasicMaintainData",
-                                date
-                        )
+                                date,
+                                true,
+                                "Code=1")
                 ));
+
+        models.add(getBusinessStatusErrorModel("ext-service-cl-list-aggregator", "/channel/getChannelModuleInfo", date));
+        models.add(getBusinessStatusErrorModel("int-restful-mlp-product-search-api", "/module/search/pageListAndFilter", date));
+        models.add(getBusinessStatusErrorModel("ext-website-cl-maint-api", "/mainline/maintenance/basic", date));
 
         models.sort(this::compareBusinessModels);
         return models;
+    }
+
+    private BusinessStatusErrorModel getBusinessStatusErrorModel(String appId, String url, LocalDate date) {
+
+        BusinessStatusErrorModel businessStatusErrorModel = new BusinessStatusErrorModel();
+        businessStatusErrorModel.setAppId(appId);
+        businessStatusErrorModel.setUrl(url);
+        businessStatusErrorModel.setTotalRequests(elasticsearchQuery.getTotal(appId, url, date, false, null));
+        businessStatusErrorModel.setErrorRequests(elasticsearchQuery.getTotal(appId, url, date, true, "code=10000"));
+
+
+        return businessStatusErrorModel;
     }
 
     private UrlStatusErrorModel mapToUrlStatusErrorModel(List<String> row) {
