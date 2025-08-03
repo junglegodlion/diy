@@ -31,6 +31,20 @@ public class CsvUtils {
     private static final LocalDate DATE_THRESHOLD = LocalDate.of(2025, 1, 17);
     private static final String HOST_NAME = "cl-gateway.tuhu.cn";
 
+    public static List<List<String>> getLists(MultipartFile file) {
+        return getLists(file, false);
+    }
+
+    public static List<List<String>> getLists(MultipartFile file, boolean skipFirstRow) {
+        List<List<String>> csvData = null;
+        try {
+            csvData = CsvUtils.getDataFromInputStream(file.getInputStream(), skipFirstRow);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return csvData;
+    }
+
     /**
      * 从指定路径读取CSV数据
      * @param directoryName 目标目录名 (可优化为更具体的参数名)
@@ -73,19 +87,30 @@ public class CsvUtils {
         return newData;
     }
 
-    public static List<List<String>> getDataFromInputStream(InputStream inputStream) {
+    public static List<List<String>> getDataFromInputStream(InputStream inputStream, boolean skipFirstRow) {
         List<List<String>> data = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
             CSVParser parser = CSVFormat.DEFAULT.parse(reader);
+            boolean isFirstRow = true;
             for (CSVRecord record : parser) {
+                // 根据参数决定是否跳过第一行
+                if (skipFirstRow && isFirstRow) {
+                    isFirstRow = false;
+                    continue;
+                }
                 List<String> row = new ArrayList<>();
                 record.forEach(row::add);
                 data.add(row);
             }
         } catch (IOException e) {
-            log.error("CsvUtils#getData,出现异常！", e);
+            log.error("CsvUtils#getDataFromInputStream,出现异常！", e);
         }
         return data;
+    }
+
+    // 重载方法，保持向后兼容，默认不跳过第一行
+    public static List<List<String>> getDataFromInputStream(InputStream inputStream) {
+        return getDataFromInputStream(inputStream, false);
     }
 
 

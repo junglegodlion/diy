@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jungo.diy.mapper.MaintCriticalDownStreamMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.jungo.diy.entity.MaintCriticalDownStreamEntity">
+        <id column="id" property="id" />
+        <result column="client_app_id" property="clientAppId" />
+        <result column="server_app_id" property="serverAppId" />
+        <result column="interface_url" property="interfaceUrl" />
+        <result column="p99" property="p99" />
+        <result column="date" property="date" />
+        <result column="is_deleted" property="isDeleted" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <!-- 表字段 -->
+    <sql id="Base_Column_List">
+        id, client_app_id, server_app_id, interface_url, p99, date, 
+        is_deleted, create_time, update_time
+    </sql>
+
+
+
+    <insert id="batchInsert">
+        INSERT INTO maint_critical_downstream_list(client_app_id, server_app_id, interface_url, p99, date)
+        VALUES
+        <foreach collection="list" item="item" index="index" separator=",">
+            (#{item.clientAppId}, #{item.serverAppId}, #{item.interfaceUrl}, #{item.p99}, #{item.date})
+        </foreach>
+    </insert>
+</mapper>

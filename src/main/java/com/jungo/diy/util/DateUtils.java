@@ -78,4 +78,17 @@ public class DateUtils {
         return LocalDate.parse(date, formatter);
     }
 
+
+    /**
+     * 将LocalDate转换为Date对象
+     * @param localDate 需要转换的LocalDate对象
+     * @return 转换后的Date对象，表示该日期的开始时刻(00:00:00)
+     * @throws IllegalArgumentException 当localDate为null时抛出
+     */
+    public static Date getDate(LocalDate localDate) {
+        if (localDate == null) {
+            throw new IllegalArgumentException("localDate cannot be null");
+        }
+        return Date.from(localDate.atStartOfDay(ZoneId.of("UTC")).toInstant());
+    }
 }

@@ -85,12 +85,7 @@ public class FileService {
     }
 
     public List<UrlStatusErrorModel> processAccessLogFile(MultipartFile accesslogFile) {
-        List<List<String>> csvData = null;
-        try {
-            csvData = CsvUtils.getDataFromInputStream(accesslogFile.getInputStream());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        List<List<String>> csvData = CsvUtils.getLists(accesslogFile);
 
         return csvData.stream()
                 .skip(1)
@@ -101,6 +96,8 @@ public class FileService {
                 .sorted(this::compareUrlStatusModels)
                 .collect(Collectors.toList());
     }
+
+
 
     private int compareUrlStatusModels(UrlStatusErrorModel m1, UrlStatusErrorModel m2) {
         int index1 = Arrays.asList(STATUS_CODE_URLS).indexOf(m1.getUrl());
