@@ -28,9 +28,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -61,10 +63,22 @@ public class UrlErrorRateController {
             createStatusSheet(workbook, statusModels);
             createBusinessSheet(workbook, businessModels);
             createSuccessSheet(workbook, businessModels);
-
-            String fileName = URLEncoder.encode("httpError.xlsx", StandardCharsets.UTF_8.toString());
-            saveWorkbookToFile(workbook, FileConstants.OUTPUT_DIRECTORY, fileName);
+            String directory = buildOutputDirectory();
+            String fileName = buildOutputFileName();
+            saveWorkbookToFile(workbook, directory, fileName);
+        } catch (IOException e) {
+            log.error("生成Excel文件失败", e);
+            throw e;
         }
+    }
+
+    private String buildOutputDirectory() {
+        String dateStr = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        return FileConstants.OUTPUT_DIRECTORY + "/" + dateStr;
+    }
+
+    private String buildOutputFileName() throws UnsupportedEncodingException {
+        return URLEncoder.encode("httpError.xlsx", StandardCharsets.UTF_8.toString());
     }
 
     /**
