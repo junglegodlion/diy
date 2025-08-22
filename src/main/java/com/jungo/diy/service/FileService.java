@@ -142,6 +142,7 @@ public class FileService {
         models.add(getBusinessStatusErrorModel("ext-service-cl-list-aggregator", "/channel/getChannelModuleInfo", date));
         models.add(getBusinessStatusErrorModel("int-restful-mlp-product-search-api", "/module/search/pageListAndFilter", date));
         models.add(getBusinessStatusErrorModel("ext-website-cl-maint-api", "/mainline/maintenance/basic", date));
+        models.add(getBusinessStatusErrorModel("int-spring-cl-homepage-service", "/homePage/getHomePageInfo", date));
 
         models.sort(this::compareBusinessModels);
         return models;

@@ -11,6 +11,7 @@ public class FileConstants {
 
 
     public static final String[] STATUS_CODE_URLS = {
+            "/cl-homepage-service/homePage/getHomePageInfo",
             "/cl-list-aggregator/channel/getChannelModuleInfo",
             "/mlp-product-search-api/module/search/pageListAndFilter",
             "/cl-tire-site/tireListModule/getTireList",
@@ -29,6 +30,7 @@ public class FileConstants {
     };
 
     public static final String[] BUSINESS_ERROR_URLS = {
+            "/homePage/getHomePageInfo",
             "/channel/getChannelModuleInfo",
             "/module/search/pageListAndFilter",
             "/tireListModule/getTireList",
