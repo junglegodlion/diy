@@ -48,6 +48,9 @@ public class FileConstants {
             "/order/getConfirmOrderData"
     };
 
+    public static final String[] WEEKLY_PERFORMANCE_TITLES = {
+           "url", "p90", "p99","date"
+    };
 
     public static final String[] STATUS_COLUMN_TITLES = {
             "host", "url", "status", "请求次数", "请求总数", "占比", "非200占比"
