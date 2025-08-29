@@ -30,4 +30,8 @@ public interface ApiDailyPerformanceMapper {
     List<ApiDailyPerformanceEntity> getSlowRequestRate(@Param("url")String url, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     List<ApiDailyPerformanceEntity> getRecordsByPkidRange(@Param("startId") long startId, @Param("endId") long endId);
+
+    List<ApiDailyPerformanceEntity> getDailyApiPerformance(@Param("url")String url, @Param("date") LocalDate date);
+
+    List<ApiDailyPerformanceEntity> getApiListDailyPerformance(@Param("apiUrls")List<String> apiUrls, @Param("date") LocalDate date);
 }

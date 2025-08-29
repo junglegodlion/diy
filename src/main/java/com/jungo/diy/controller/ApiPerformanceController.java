@@ -6,15 +6,19 @@ import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
 import com.jungo.diy.model.ExcelModel;
 import com.jungo.diy.model.SheetModel;
 import com.jungo.diy.model.UrlStatusErrorModel;
+import com.jungo.diy.service.ApiPerformanceService;
 import com.jungo.diy.service.FileService;
 import com.jungo.diy.util.DateUtils;
+import com.jungo.diy.util.FileUtils;
 import com.jungo.diy.util.TableUtils;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -49,6 +53,9 @@ import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 @RequestMapping("/api")
 public class ApiPerformanceController {
 
+    @Autowired
+    private ApiPerformanceService apiPerformanceService;
+
     List<String> apiUrls = Arrays.asList(
             "/cl-homepage-service/homePage/getHomePageInfo",
             "/cl-list-aggregator/channel/getChannelModuleInfo",
@@ -78,8 +85,9 @@ public class ApiPerformanceController {
      * 生成API性能报告Excel文件
      * 该方法会查询预定义API列表的性能数据，并生成包含汇总和详细信息的Excel报告
      */
-    @PostMapping("/generate-performance-report")
-    public void generatePerformanceReport() {
+    @PostMapping("/generate-weekly-performance-report")
+    public void generateWeeklyPerformanceReport() {
+
         List<List<ApiDailyPerformanceEntity>> lists = new ArrayList<>();
         for (String apiUrl : apiUrls) {
             List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-08-18"), LocalDate.parse("2025-08-24"));
@@ -95,12 +103,19 @@ public class ApiPerformanceController {
                 String string = list.stream().findFirst().map(ApiDailyPerformanceEntity::getUrl).orElse(null);
                 createSheet(workbook, list, generateSheetName(string));
             }
-            saveWorkbookToFile(workbook, buildOutputDirectory(), buildOutputFileName());
+            FileUtils.saveWorkbookToFile(workbook, FileUtils.buildOutputDirectory(LocalDate.now().format(DateTimeFormatter.ISO_DATE)), FileUtils.buildOutputFileName("20250825.xlsx"));
         } catch (IOException e) {
             log.error("生成Excel文件失败", e);
         }
+    }
 
-
+    /**
+     * 生成API性能报告Excel文件
+     * 该方法会查询预定义API列表的性能数据，并生成包含汇总和详细信息的Excel报告
+     */
+    @PostMapping("/generate-daily-performance-report")
+    public void generateDailyPerformanceReport(@ApiParam(value = "具体日期", required = true) @RequestParam("date") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        apiPerformanceService.generateWeeklyPerformanceReport(date);
     }
 
     private String generateSheetName(String token) {
@@ -112,13 +127,8 @@ public class ApiPerformanceController {
         return name.length() > 31 ? name.substring(0, 28) + "..." : name;
     }
 
-    private String buildOutputFileName() throws UnsupportedEncodingException {
-        return URLEncoder.encode("20250825.xlsx", StandardCharsets.UTF_8.toString());
-    }
-    private String buildOutputDirectory() {
-        String dateStr = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
-        return FileConstants.OUTPUT_DIRECTORY + "/" + dateStr;
-    }
+
+
 
     private void createNewSheet(XSSFWorkbook workbook, List<List<ApiDailyPerformanceEntity>> lists,String sheetName) {
 
@@ -201,19 +211,5 @@ public class ApiPerformanceController {
                 });
     }
 
-    private void saveWorkbookToFile(XSSFWorkbook workbook, String directoryPath, String fileName) throws IOException {
-        // 确保目录存在，如果不存在则创建
-        File directory = new File(directoryPath);
-        if (!directory.exists()) {
-            boolean created = directory.mkdirs();
-            if (!created) {
-                log.warn("无法创建目录: {}", directoryPath);
-            }
-        }
 
-        File file = new File(directory, fileName);
-        try (FileOutputStream out = new FileOutputStream(file)) {
-            workbook.write(out);
-        }
-    }
 }

@@ -65,4 +65,24 @@
         </where>
         ORDER BY id ASC
     </select>
+
+    <select id="getDailyApiPerformance" resultMap="BaseResultMap">
+        SELECT * FROM api_daily_performance WHERE url = #{url} AND date = #{date}
+    </select>
+
+    <select id="getApiListDailyPerformance" resultMap="BaseResultMap">
+        SELECT
+        id,
+        url,
+        p90,
+        p99,
+        date
+        FROM api_daily_performance
+        WHERE url IN
+        <foreach collection="apiUrls" item="apiurl" open="(" separator="," close=")">
+            #{apiurl}
+        </foreach>
+        AND date = #{date}
+        ORDER BY url
+    </select>
 </mapper>
