@@ -74,8 +74,12 @@ public class ApiPerformanceController {
     @Autowired
     private ApiDailyPerformanceMapper apiDailyPerformanceMapper;
 
-    @PostMapping("/look")
-    public void readFile() {
+    /**
+     * 生成API性能报告Excel文件
+     * 该方法会查询预定义API列表的性能数据，并生成包含汇总和详细信息的Excel报告
+     */
+    @PostMapping("/generate-performance-report")
+    public void generatePerformanceReport() {
         List<List<ApiDailyPerformanceEntity>> lists = new ArrayList<>();
         for (String apiUrl : apiUrls) {
             List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-08-18"), LocalDate.parse("2025-08-24"));
@@ -198,7 +202,7 @@ public class ApiPerformanceController {
     }
 
     private void saveWorkbookToFile(XSSFWorkbook workbook, String directoryPath, String fileName) throws IOException {
-// 确保目录存在，如果不存在则创建
+        // 确保目录存在，如果不存在则创建
         File directory = new File(directoryPath);
         if (!directory.exists()) {
             boolean created = directory.mkdirs();
