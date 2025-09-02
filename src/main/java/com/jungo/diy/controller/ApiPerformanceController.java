@@ -90,7 +90,7 @@ public class ApiPerformanceController {
 
         List<List<ApiDailyPerformanceEntity>> lists = new ArrayList<>();
         for (String apiUrl : apiUrls) {
-            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-08-18"), LocalDate.parse("2025-08-24"));
+            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-08-25"), LocalDate.parse("2025-08-31"));
             // 内部列表按时间排序
             slowRequestRate.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
 
