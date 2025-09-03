@@ -61,26 +61,57 @@ public class RemoteTarProcessor {
 
     // 解压 tar 文件
     public static void extractTarFile(File tarFile, File outputDir) throws IOException {
-        if (!outputDir.exists()) {
-            outputDir.mkdirs();
+        // 输入参数验证
+        if (tarFile == null || !tarFile.exists() || !tarFile.isFile()) {
+            throw new IllegalArgumentException("TAR文件不存在或不是有效文件");
+        }
+        if (outputDir == null) {
+            throw new IllegalArgumentException("输出目录不能为空");
         }
 
-        try (FileInputStream fis = new FileInputStream(tarFile);
-             BufferedInputStream bis = new BufferedInputStream(fis);
-             TarArchiveInputStream tais = new TarArchiveInputStream(bis)) {
+        // 创建输出目录（如果不存在）
+        if (!outputDir.exists() && !outputDir.mkdirs()) {
+            throw new IOException("无法创建输出目录: " + outputDir.getAbsolutePath());
+        }
+
+        try (TarArchiveInputStream tais = new TarArchiveInputStream(
+                new BufferedInputStream(new FileInputStream(tarFile)))) {
 
             TarArchiveEntry entry;
-            while ((entry = tais.getNextTarEntry()) != null) {
-                if (entry.isDirectory()) continue;
+            // 使用推荐的getNextEntry()替代已弃用的getNextTarEntry()
+            while ((entry = (TarArchiveEntry) tais.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    // 处理目录条目
+                    File dir = new File(outputDir, entry.getName());
+                    if (!dir.exists() && !dir.mkdirs()) {
+                        log.warn("无法创建目录: {}", dir.getAbsolutePath());
+                    }
+                    continue;
+                }
 
                 File outFile = new File(outputDir, entry.getName());
+
+                // 安全检查：防止路径遍历攻击
+                if (!outFile.getCanonicalPath().startsWith(outputDir.getCanonicalPath())) {
+                    throw new IOException("无效的文件路径，可能存在安全风险: " + entry.getName());
+                }
+
+                // 确保父目录存在
+                File parentDir = outFile.getParentFile();
+                if (parentDir != null && !parentDir.exists() && !parentDir.mkdirs()) {
+                    throw new IOException("无法创建父目录: " + parentDir.getAbsolutePath());
+                }
+
                 try (FileOutputStream fos = new FileOutputStream(outFile)) {
                     IOUtils.copy(tais, fos);
                 }
-                System.out.println("解压完成: " + outFile.getAbsolutePath());
+
+                log.debug("解压文件: {}", outFile.getName());
             }
         }
+        log.info("TAR文件解压完成: {}", tarFile.getName());
     }
+
 
     // 解析文件内容
     public static void parseFile(File file) throws IOException {
