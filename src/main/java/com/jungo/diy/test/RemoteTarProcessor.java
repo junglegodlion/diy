@@ -130,29 +130,47 @@ public class RemoteTarProcessor {
 
     // 删除文件或目录
     public static void deleteFileOrDir(File file) throws IOException {
+        // 输入验证
+        if (file == null) {
+            throw new IllegalArgumentException("文件对象不能为空");
+        }
+
         if (!file.exists()) {
+            log.debug("文件不存在，无需删除: {}", file.getAbsolutePath());
             return;
         }
 
-        if (file.isDirectory()) {
-            try (Stream<Path> paths = Files.walk(file.toPath())) {
-                paths.sorted(Comparator.reverseOrder()) // 使用内置比较器
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException e) {
-                                throw new UncheckedIOException("删除文件失败: " + path, e);
-                            }
-                        });
-            } catch (UncheckedIOException e) {
-                throw e.getCause(); // 重新抛出原始IOException
+        try {
+            if (file.isDirectory()) {
+                // 使用Files.walk()直接删除目录及其内容
+                try (Stream<Path> paths = Files.walk(file.toPath())) {
+                    paths.sorted(Comparator.reverseOrder())
+                            .forEach(path -> {
+                                try {
+                                    Files.delete(path);
+                                    log.debug("已删除: {}", path);
+                                } catch (IOException e) {
+                                    throw new UncheckedIOException(
+                                            String.format("删除文件失败: %s, 原因: %s",
+                                                    path, e.getMessage()), e);
+                                }
+                            });
+                }
+            } else {
+                // 删除单个文件
+                Files.deleteIfExists(file.toPath());
+                log.debug("已删除文件: {}", file.getAbsolutePath());
             }
-        } else {
-            Files.deleteIfExists(file.toPath());
-        }
 
-        System.out.println("已删除: " + file.getAbsolutePath());
+            log.info("成功删除: {}", file.getAbsolutePath());
+
+        } catch (UncheckedIOException e) {
+            // 重新抛出原始IOException，保留详细的错误信息
+            throw new IOException(String.format("删除操作失败: %s", file.getAbsolutePath()),
+                    e.getCause());
+        }
     }
+
 
 
     public static void main(String[] args) {
