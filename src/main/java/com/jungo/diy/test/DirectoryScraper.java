@@ -1,5 +1,6 @@
 package com.jungo.diy.test;
 
+import com.jungo.diy.util.JsonUtils;
 import kong.unirest.HttpResponse;
 import kong.unirest.Unirest;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,7 @@ import java.util.List;
 public class DirectoryScraper {
 
     public static void main(String[] args) throws IOException {
-        String directoryUrl = "https://sre.tuhuyun.cn/upload/log_data_export/2025-08-14/";
+        String directoryUrl = "https://sre.tuhuyun.cn/upload/log_data_export/2025-09-14/";
         String localDownloadPath = "./downloads/";
 
         Document doc = Jsoup.connect(directoryUrl).get();
@@ -39,9 +40,10 @@ public class DirectoryScraper {
             try {
                 String decodedUrl = URLDecoder.decode(fullUrl, "UTF-8");
                 urls.add(decodedUrl);
+                System.out.println(JsonUtils.objectToJson(urls));
                 downloadFile(decodedUrl, localDownloadPath);
             } catch (UnsupportedEncodingException e) {
-                downloadFile(fullUrl, localDownloadPath);
+                // downloadFile(fullUrl, localDownloadPath);
             }
         }
     }

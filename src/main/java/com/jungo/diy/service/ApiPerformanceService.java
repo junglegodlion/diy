@@ -18,10 +18,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
@@ -69,5 +71,63 @@ public class ApiPerformanceService {
             log.error("生成Excel文件失败", e);
         }
 
+    }
+
+    public void generateQ3PerformanceReport() {
+        List<ApiDailyPerformanceEntity> lists = new ArrayList<>();
+
+        List<String> apiUrls = ApiUrlReader.readApiUrls("api-urls.txt");
+        for (String apiUrl : apiUrls) {
+            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-07-01"), LocalDate.parse("2025-09-25"));
+            // slowRequestRate存在日期相同的数据，保留totalRequestCount最大的那条数据
+            // 按日期分组，保留每个日期中totalRequestCount最大的记录
+            Map<Date, ApiDailyPerformanceEntity> maxByDate = slowRequestRate.stream()
+                    .collect(Collectors.toMap(
+                            ApiDailyPerformanceEntity::getDate,
+                            Function.identity(),
+                            (existing, replacement) ->
+                                    existing.getTotalRequestCount() > replacement.getTotalRequestCount() ? existing : replacement
+                    ));
+            // 转换为列表并按日期排序
+            List<ApiDailyPerformanceEntity> filteredAndSorted = new ArrayList<>(maxByDate.values());
+            // 内部列表按时间排序
+            filteredAndSorted.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
+
+            lists.addAll(filteredAndSorted);
+        }
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            createNewSheet(workbook, lists, "Q3数据");
+            FileUtils.saveWorkbookToFile(workbook, FileUtils.buildOutputDirectory(LocalDate.now().format(DateTimeFormatter.ISO_DATE)), FileUtils.buildOutputFileName("20250925.xlsx"));
+        } catch (IOException e) {
+            log.error("生成Excel文件失败", e);
+        }
+    }
+
+    private void createNewSheet(XSSFWorkbook workbook, List<ApiDailyPerformanceEntity> lists, String sheetName) {
+
+        XSSFSheet sheet = workbook.createSheet(sheetName);
+        List<String> titlesWithAvg = new ArrayList<>();
+        titlesWithAvg.add("url");
+        titlesWithAvg.add("p90");
+        titlesWithAvg.add("p99");
+        titlesWithAvg.add("date");
+        TableUtils.createChartData(workbook, sheet, lists, titlesWithAvg.toArray(new String[0]),
+                (model, col, cell) -> {
+                    switch (col) {
+                        case 0:
+                            cell.setCellValue(model.getUrl());
+                            break;
+                        case 1:
+                            cell.setCellValue(model.getP90());
+                            break;
+                        case 2:
+                            cell.setCellValue(model.getP99());
+                            break;
+                        case 3:
+                            cell.setCellValue(DateUtils.getDateString(model.getDate(), YYYY_MM_DD));
+                            break;
+                    }
+                });
     }
 }

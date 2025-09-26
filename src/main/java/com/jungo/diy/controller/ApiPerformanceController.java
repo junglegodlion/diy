@@ -39,6 +39,9 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.jungo.diy.constants.FileConstants.STATUS_COLUMN_TITLES;
 import static com.jungo.diy.constants.FileConstants.WEEKLY_PERFORMANCE_TITLES;
@@ -90,11 +93,22 @@ public class ApiPerformanceController {
 
         List<List<ApiDailyPerformanceEntity>> lists = new ArrayList<>();
         for (String apiUrl : apiUrls) {
-            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-08-25"), LocalDate.parse("2025-08-31"));
+            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-09-15"), LocalDate.parse("2025-09-21"));
+            // slowRequestRate存在日期相同的数据，保留totalRequestCount最大的那条数据
+            // 按日期分组，保留每个日期中totalRequestCount最大的记录
+            Map<Date, ApiDailyPerformanceEntity> maxByDate = slowRequestRate.stream()
+                    .collect(Collectors.toMap(
+                            ApiDailyPerformanceEntity::getDate,
+                            Function.identity(),
+                            (existing, replacement) ->
+                                    existing.getTotalRequestCount() > replacement.getTotalRequestCount() ? existing : replacement
+                    ));
+            // 转换为列表并按日期排序
+            List<ApiDailyPerformanceEntity> filteredAndSorted = new ArrayList<>(maxByDate.values());
             // 内部列表按时间排序
-            slowRequestRate.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
+            filteredAndSorted.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
 
-            lists.add(slowRequestRate);
+            lists.add(filteredAndSorted);
         }
 
         try (XSSFWorkbook workbook = new XSSFWorkbook()) {
@@ -107,6 +121,11 @@ public class ApiPerformanceController {
         } catch (IOException e) {
             log.error("生成Excel文件失败", e);
         }
+    }
+
+    @PostMapping("/generate-Q3-performance-report")
+    public void generateQ3PerformanceReport() {
+        apiPerformanceService.generateQ3PerformanceReport();
     }
 
     /**
