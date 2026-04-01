@@ -16,13 +16,11 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -78,7 +76,7 @@ public class ApiPerformanceService {
 
         List<String> apiUrls = ApiUrlReader.readApiUrls("api-urls.txt");
         for (String apiUrl : apiUrls) {
-            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-07-01"), LocalDate.parse("2025-09-25"));
+            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getApiPerformance(apiUrl, LocalDate.parse("2025-07-01"), LocalDate.parse("2025-09-25"));
             // slowRequestRate存在日期相同的数据，保留totalRequestCount最大的那条数据
             // 按日期分组，保留每个日期中totalRequestCount最大的记录
             Map<Date, ApiDailyPerformanceEntity> maxByDate = slowRequestRate.stream()

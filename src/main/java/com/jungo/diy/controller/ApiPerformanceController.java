@@ -1,20 +1,13 @@
 package com.jungo.diy.controller;
 
-import com.jungo.diy.constants.FileConstants;
 import com.jungo.diy.entity.ApiDailyPerformanceEntity;
 import com.jungo.diy.mapper.ApiDailyPerformanceMapper;
-import com.jungo.diy.model.ExcelModel;
-import com.jungo.diy.model.SheetModel;
-import com.jungo.diy.model.UrlStatusErrorModel;
 import com.jungo.diy.service.ApiPerformanceService;
-import com.jungo.diy.service.FileService;
 import com.jungo.diy.util.DateUtils;
 import com.jungo.diy.util.FileUtils;
 import com.jungo.diy.util.TableUtils;
-import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiParam;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,19 +16,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -43,7 +29,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static com.jungo.diy.constants.FileConstants.STATUS_COLUMN_TITLES;
 import static com.jungo.diy.constants.FileConstants.WEEKLY_PERFORMANCE_TITLES;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
 
@@ -93,7 +78,7 @@ public class ApiPerformanceController {
 
         List<List<ApiDailyPerformanceEntity>> lists = new ArrayList<>();
         for (String apiUrl : apiUrls) {
-            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getSlowRequestRate(apiUrl, LocalDate.parse("2025-09-15"), LocalDate.parse("2025-09-21"));
+            List<ApiDailyPerformanceEntity> slowRequestRate = apiDailyPerformanceMapper.getApiPerformance(apiUrl, LocalDate.parse("2025-09-22"), LocalDate.parse("2025-09-27"));
             // slowRequestRate存在日期相同的数据，保留totalRequestCount最大的那条数据
             // 按日期分组，保留每个日期中totalRequestCount最大的记录
             Map<Date, ApiDailyPerformanceEntity> maxByDate = slowRequestRate.stream()

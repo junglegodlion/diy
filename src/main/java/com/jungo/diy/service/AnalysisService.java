@@ -31,13 +31,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.jungo.diy.util.DateUtils.YYYY_MM;
 import static com.jungo.diy.util.DateUtils.YYYY_MM_DD;
@@ -645,7 +642,7 @@ public class AnalysisService {
                                                HttpServletResponse response) {
         Map<String, List<SlowRequestRateModel>> urlMap = new HashMap<>();
         for (String url : urls) {
-            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.getSlowRequestRate(url, startDate, endDate);
+            List<ApiDailyPerformanceEntity> apiDailyPerformanceEntities = apiDailyPerformanceMapper.getApiPerformance(url, startDate, endDate);
             // apiDailyPerformanceEntities按照日期排序
             apiDailyPerformanceEntities.sort(Comparator.comparing(ApiDailyPerformanceEntity::getDate));
             List<SlowRequestRateModel> slowRequestRateModels = getSlowRequestRateModelsNew(apiDailyPerformanceEntities);
